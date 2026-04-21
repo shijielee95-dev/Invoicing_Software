@@ -42,6 +42,46 @@ function e(mixed $val): string {
     return htmlspecialchars((string)($val ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+// Helper: detect the app's web path (example: /project)
+function appBasePath(): string {
+    static $basePath = null;
+
+    if ($basePath !== null) {
+        return $basePath;
+    }
+
+    $basePath = '/';
+
+    $documentRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+    if ($documentRoot !== '') {
+        $normalizedDoc = rtrim(str_replace('\\', '/', realpath($documentRoot) ?: $documentRoot), '/');
+        $normalizedApp = rtrim(str_replace('\\', '/', realpath(APP_ROOT) ?: APP_ROOT), '/');
+
+        if ($normalizedDoc !== '' && str_starts_with($normalizedApp, $normalizedDoc)) {
+            $relative = trim(substr($normalizedApp, strlen($normalizedDoc)), '/');
+            $basePath = $relative === '' ? '/' : '/' . $relative;
+            return $basePath;
+        }
+    }
+
+    if (defined('COOKIE_PATH') && COOKIE_PATH) {
+        $basePath = '/' . trim((string) COOKIE_PATH, '/');
+        return $basePath === '' ? '/' : $basePath;
+    }
+
+    $appUrlPath = parse_url(APP_URL, PHP_URL_PATH);
+    if (is_string($appUrlPath) && $appUrlPath !== '') {
+        $basePath = '/' . trim($appUrlPath, '/');
+    }
+
+    return $basePath === '' ? '/' : $basePath;
+}
+
+// Helper: app base href with trailing slash for HTML <base>
+function appBaseHref(): string {
+    return rtrim(appBasePath(), '/') . '/';
+}
+
 // Helper: redirect
 function redirect(string $url): never {
     header('Location: ' . $url);
