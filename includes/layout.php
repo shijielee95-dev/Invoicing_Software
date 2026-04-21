@@ -74,6 +74,7 @@ function layoutOpen(string $pageTitle = '', string $pageSubtitle = ''): void {
         var SKIP = ['checkbox','radio','submit','reset','button','hidden','file','password','search','range','color'];
         function makeSearch(el) {
             if (!el || SKIP.indexOf(el.type) !== -1) return;
+            if (el.hasAttribute('data-no-search-convert')) return;
             el._origType = el.type || 'text';
             el.type = 'search';
             el.setAttribute('autocomplete', 'off');

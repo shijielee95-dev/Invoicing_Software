@@ -877,6 +877,61 @@ try {
     ")->fetchAll();
 } catch (Exception $e) { $products_for_invoice = []; }
 
+// Quotation import data for the invoice modal
+$quotationImports = [];
+try {
+    $qRows = $pdo->query("
+        SELECT id, quotation_no, customer_name, quotation_date, description, total_amount, status
+        FROM quotations
+        ORDER BY quotation_date DESC, id DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $qiRows = $pdo->query("
+        SELECT quotation_id, product_id, description, item_description, quantity, unit_price,
+               discount_pct, discount_mode, tax_type, line_total, classification, row_type
+        FROM quotation_items
+        ORDER BY quotation_id, sort_order, id
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $itemsByQuotation = [];
+    foreach ($qiRows as $qi) {
+        $qid = (int)($qi['quotation_id'] ?? 0);
+        if (!isset($itemsByQuotation[$qid])) $itemsByQuotation[$qid] = [];
+        $itemsByQuotation[$qid][] = [
+            'product_id'       => (int)($qi['product_id'] ?? 0),
+            'description'      => (string)($qi['description'] ?? ''),
+            'item_description' => (string)($qi['item_description'] ?? ''),
+            'quantity'         => (float)($qi['quantity'] ?? 0),
+            'unit_price'       => (float)($qi['unit_price'] ?? 0),
+            'discount_pct'     => (float)($qi['discount_pct'] ?? 0),
+            'discount_mode'    => (string)($qi['discount_mode'] ?? 'pct'),
+            'tax_type'         => (string)($qi['tax_type'] ?? ''),
+            'line_total'       => (float)($qi['line_total'] ?? 0),
+            'classification'   => (string)($qi['classification'] ?? ''),
+            'row_type'         => (string)($qi['row_type'] ?? 'item'),
+        ];
+    }
+
+    foreach ($qRows as $q) {
+        $qid = (int)($q['id'] ?? 0);
+        $quotationImports[] = [
+            'id'             => $qid,
+            'quotation_no'   => (string)($q['quotation_no'] ?? ''),
+            'customer_name'  => (string)($q['customer_name'] ?? ''),
+            'quotation_date' => (string)($q['quotation_date'] ?? ''),
+            'quotation_date_display' => !empty($q['quotation_date']) ? date('d/m/Y', strtotime($q['quotation_date'])) : '',
+            'ref_no'         => '-',
+            'description'    => (string)($q['description'] ?? ''),
+            'total_amount'   => (float)($q['total_amount'] ?? 0),
+            'status'         => (string)($q['status'] ?? ''),
+            'import_status'  => 'Ready',
+            'items'          => $itemsByQuotation[$qid] ?? [],
+        ];
+    }
+} catch (Exception $e) {}
+
+$quotationImportsJson = json_encode($quotationImports, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+
 // Load default billing/shipping contact persons and addresses for each customer
 $_custIds = array_column($customers, 'id');
 $_defPersonsBilling  = [];
@@ -981,6 +1036,92 @@ layoutOpen($pageTitle, $pageSub);
     </div>
 </div>
 
+<div id="quotationImportModal" class="fixed inset-0 items-center justify-center px-4 py-6" style="z-index:10000;display:none">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeQuotationImportModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-auto flex flex-col border border-slate-200 overflow-hidden" style="height:min(88vh,720px)">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+            <div>
+                <h3 class="text-base font-semibold text-slate-800">Import From Quotation</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Choose one or more quotations to bring their item lines into this invoice.</p>
+            </div>
+            <button type="button" onclick="closeQuotationImportModal()"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors text-xl">&times;</button>
+        </div>
+
+        <div class="px-6 py-4 border-b border-slate-100 shrink-0">
+            <div class="grid grid-cols-1 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] gap-3 items-end">
+                <div>
+                    <label class="<?= t('label') ?>">Customer</label>
+                    <div class="relative">
+                        <input type="hidden" id="qiCustomerFilter" value="">
+                        <input type="text" id="qiCustomerInput" placeholder="All Customers" autocomplete="off"
+                               onfocus="openQuotationCustomerDropdown()"
+                               oninput="filterQuotationCustomerOptions()"
+                               onblur="blurQuotationCustomerDropdown()"
+                               onkeydown="handleQuotationCustomerKey(event)"
+                               class="w-full h-9 px-3 pr-8 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:border-indigo-500 transition placeholder:text-slate-400">
+                        <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 shrink-0 transition-transform pointer-events-none" id="qiCustomerChevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                        <div id="qiCustomerPanel" data-dd-panel style="display:none"
+                             class="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                            <ul id="qiCustomerOptions" class="max-h-56 overflow-y-auto py-1"></ul>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="<?= t('label') ?>">Date Range</label>
+                    <div class="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                        <div class="relative">
+                            <input type="text" id="qiDateFrom" readonly placeholder="Start date" class="<?= t('input') ?> cursor-pointer pr-8 bg-white">
+                            <input type="hidden" id="qiDateFromIso" value="">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </div>
+                        <div class="text-center text-slate-300 text-sm">to</div>
+                        <div class="relative">
+                            <input type="text" id="qiDateTo" readonly placeholder="End date" class="<?= t('input') ?> cursor-pointer pr-8 bg-white">
+                            <input type="hidden" id="qiDateToIso" value="">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <button type="button" onclick="applyQuotationImportFilters()" class="<?= t('btn_base') ?> <?= t('btn_primary') ?> h-9">Update</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-hidden">
+            <div class="h-full overflow-auto px-6 py-3">
+                <table class="w-full text-sm">
+                    <thead class="sticky top-0 bg-slate-50 z-10">
+                        <tr class="border-b border-slate-200">
+                            <th class="w-10 px-2 py-3 text-left">
+                                <input type="checkbox" id="qiSelectAll" onclick="toggleQuotationImportSelectAll(this.checked)"
+                                       class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            </th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">No.</th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer</th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ref No.</th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</th>
+                            <th class="px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Amount</th>
+                            <th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quotationImportBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+            <p id="quotationImportHint" class="text-sm text-slate-400">Select at least one quotation to import its items.</p>
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="closeQuotationImportModal()" class="<?= t('btn_base') ?> <?= t('btn_ghost') ?> h-9">Cancel</button>
+                <button type="button" id="quotationImportConfirmBtn" onclick="confirmQuotationImport()" class="<?= t('btn_base') ?> <?= t('btn_primary') ?> h-9" disabled>Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 /* ── Hide number input spinners in items table ── */
 .no-spin::-webkit-outer-spin-button,
@@ -1044,6 +1185,7 @@ const TAX_OPTIONS = <?php
     foreach ($taxRates as $t) $opts[] = ['value'=>(string)$t['id'], 'text'=>htmlspecialchars($t['name']).' ('.number_format((float)$t['rate'],2).'%)'];
     echo json_encode($opts);
 ?>;
+const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
 
 // Payment methods — defined early so Alpine x-data on payment rows can reference these
 // Returns payment terms from DB filtered by current payment mode
@@ -1620,6 +1762,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                                    @keydown.enter.prevent="pickActive()"
                                    placeholder="LHDN Classification..."
                                    autocomplete="off"
+                                   data-no-search-convert
                                    class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm focus:outline-none focus:border-indigo-500 transition pr-7">
                             <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
                                  :class="open?'rotate-180':''"
@@ -1665,6 +1808,38 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                 Subtotal
             </button>
+            <div class="relative">
+                <button type="button"
+                        id="importItemsBtn"
+                        onclick="toggleImportItemsMenu()"
+                        class="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 14l3 3-3 3"/><path d="M20 17h-7"/></svg>
+                    Import Items From
+                    <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" id="importItemsChevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div id="importItemsMenu"
+                     data-dd-panel
+                     style="display:none"
+                     class="fixed z-50 min-w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                    <ul class="py-1">
+                        <li>
+                            <button type="button" onclick="selectImportItemsSource('quotation')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                Quotations
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" onclick="selectImportItemsSource('sales_order')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                Sales Orders
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" onclick="selectImportItemsSource('delivery_order')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                                Delivery Orders
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Totals -->
@@ -2723,6 +2898,7 @@ function addRow(type) {
                 '@keydown.enter.prevent=\"pickActive()\" '+
                 'placeholder=\"LHDN Classification...\" '+
                 'autocomplete=\"off\" '+
+                'data-no-search-convert '+
                 'class=\"w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm focus:outline-none focus:border-indigo-500 transition pr-7\">'+
                 '<svg class=\"absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform\" :class=\"open?\'rotate-180\':\'\'\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path d=\"M19 9l-7 7-7-7\"/></svg>'+
                 '<div x-show=\"open\" @click.outside=\"open=false\" style=\"display:none\" '+
@@ -5304,6 +5480,7 @@ document.addEventListener('keydown', function(e) {
                                @keydown.enter.prevent="pickActive()"
                                placeholder="Select Classification Code"
                                autocomplete="off"
+                               data-no-search-convert
                                class="<?= t('input') ?> pr-8">
                         <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
                              :class="open?'rotate-180':''"
@@ -5471,6 +5648,595 @@ function apLhdnComp() {
 }
 
 // ── Open / Close ──
+function closeImportItemsMenu() {
+    var menu = document.getElementById('importItemsMenu');
+    var chevron = document.getElementById('importItemsChevron');
+    if (!menu) return;
+    menu.style.display = 'none';
+    if (chevron) chevron.classList.remove('rotate-180');
+}
+
+function toggleImportItemsMenu() {
+    var btn = document.getElementById('importItemsBtn');
+    var menu = document.getElementById('importItemsMenu');
+    var chevron = document.getElementById('importItemsChevron');
+    if (!btn || !menu) return;
+
+    var isOpen = menu.style.display !== 'none';
+    if (isOpen) {
+        closeImportItemsMenu();
+        return;
+    }
+
+    closeImportItemsMenu();
+    menu.style.display = 'block';
+    ddPos(btn, menu);
+    if (chevron) chevron.classList.add('rotate-180');
+}
+
+var _quotationImportFiltered = [];
+var _quotationImportSelection = {};
+var _quotationCustomerOptions = [];
+var _quotationCustomerFiltered = [];
+var _quotationCustomerActiveIdx = -1;
+var _quotationCustomerBlurTimer = null;
+
+function quotationImportEsc(val) {
+    return val == null ? '' : String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function quotationImportMoney(val) {
+    var num = parseFloat(val || 0);
+    return num.toFixed(2);
+}
+
+function populateQuotationImportCustomers() {
+    var hidden = document.getElementById('qiCustomerFilter');
+    var list = document.getElementById('qiCustomerOptions');
+    var input = document.getElementById('qiCustomerInput');
+    if (!hidden || !list || !input) return;
+    var current = hidden.value || '';
+    var names = [];
+    QUOTATION_IMPORTS.forEach(function(q) {
+        if (q.customer_name && names.indexOf(q.customer_name) === -1) names.push(q.customer_name);
+    });
+    names.sort(function(a, b) { return a.localeCompare(b); });
+    _quotationCustomerOptions = [''].concat(names);
+    input.value = current || '';
+    input.placeholder = 'All Customers';
+    renderQuotationCustomerOptions(_quotationCustomerOptions);
+}
+
+function closeQuotationCustomerDropdown() {
+    var panel = document.getElementById('qiCustomerPanel');
+    var chevron = document.getElementById('qiCustomerChevron');
+    if (panel) panel.style.display = 'none';
+    if (chevron) chevron.classList.remove('rotate-180');
+    _quotationCustomerActiveIdx = -1;
+}
+
+function openQuotationCustomerDropdown() {
+    var input = document.getElementById('qiCustomerInput');
+    var panel = document.getElementById('qiCustomerPanel');
+    var chevron = document.getElementById('qiCustomerChevron');
+    if (!input || !panel) return;
+    if (_quotationCustomerBlurTimer) { clearTimeout(_quotationCustomerBlurTimer); _quotationCustomerBlurTimer = null; }
+    filterQuotationCustomerOptions();
+    panel.style.display = 'block';
+    ddPos(input, panel);
+    if (chevron) chevron.classList.add('rotate-180');
+}
+
+function renderQuotationCustomerOptions(options) {
+    var list = document.getElementById('qiCustomerOptions');
+    if (!list) return;
+    _quotationCustomerFiltered = options.slice();
+    list.innerHTML = options.length
+        ? options.map(function(name, idx) {
+            var display = name || 'All Customers';
+            return '<li data-idx="' + idx + '"><button type="button" onmousedown="event.preventDefault(); setQuotationCustomerFilter(\'' + String(name).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">' + quotationImportEsc(display) + '</button></li>';
+        }).join('')
+        : '<li><div class="px-3 py-2 text-sm text-slate-400">No customers found.</div></li>';
+    _quotationCustomerActiveIdx = -1;
+}
+
+function filterQuotationCustomerOptions() {
+    var input = document.getElementById('qiCustomerInput');
+    if (!input) return;
+    var q = (input.value || '').trim().toLowerCase();
+    var filtered = _quotationCustomerOptions.filter(function(name) {
+        return !q || (name || 'All Customers').toLowerCase().includes(q);
+    });
+    renderQuotationCustomerOptions(filtered);
+}
+
+function blurQuotationCustomerDropdown() {
+    _quotationCustomerBlurTimer = setTimeout(function() {
+        _quotationCustomerBlurTimer = null;
+        closeQuotationCustomerDropdown();
+        var input = document.getElementById('qiCustomerInput');
+        var hidden = document.getElementById('qiCustomerFilter');
+        if (input && hidden) input.value = hidden.value || '';
+    }, 160);
+}
+
+function handleQuotationCustomerKey(e) {
+    var panel = document.getElementById('qiCustomerPanel');
+    var isOpen = panel && panel.style.display !== 'none';
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        closeQuotationCustomerDropdown();
+        var input = document.getElementById('qiCustomerInput');
+        var hidden = document.getElementById('qiCustomerFilter');
+        if (input && hidden) input.value = hidden.value || '';
+        if (input) input.blur();
+        return;
+    }
+    if (!isOpen && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+        e.preventDefault();
+        openQuotationCustomerDropdown();
+        return;
+    }
+    if (!isOpen) return;
+    var rows = panel.querySelectorAll('li[data-idx]');
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _quotationCustomerActiveIdx = Math.min(_quotationCustomerActiveIdx + 1, rows.length - 1);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _quotationCustomerActiveIdx = Math.max(_quotationCustomerActiveIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_quotationCustomerActiveIdx >= 0 && _quotationCustomerFiltered[_quotationCustomerActiveIdx] !== undefined) {
+            setQuotationCustomerFilter(_quotationCustomerFiltered[_quotationCustomerActiveIdx]);
+        } else {
+            setQuotationCustomerFilter('');
+        }
+        return;
+    } else {
+        return;
+    }
+    rows.forEach(function(li, idx) {
+        li.firstElementChild.classList.toggle('bg-indigo-50', idx === _quotationCustomerActiveIdx);
+        li.firstElementChild.classList.toggle('text-indigo-700', idx === _quotationCustomerActiveIdx);
+        li.firstElementChild.classList.toggle('font-medium', idx === _quotationCustomerActiveIdx);
+        if (idx === _quotationCustomerActiveIdx) li.scrollIntoView({ block:'nearest' });
+    });
+}
+
+function setQuotationCustomerFilter(value) {
+    var hidden = document.getElementById('qiCustomerFilter');
+    var input = document.getElementById('qiCustomerInput');
+    if (hidden) hidden.value = value || '';
+    if (input) input.value = value || '';
+    closeQuotationCustomerDropdown();
+    applyQuotationImportFilters();
+}
+
+function updateQuotationImportConfirmState() {
+    var filteredIds = _quotationImportFiltered.map(function(q) { return String(q.id); });
+    var selectedCount = filteredIds.filter(function(id) { return !!_quotationImportSelection[id]; }).length;
+    var btn = document.getElementById('quotationImportConfirmBtn');
+    var hint = document.getElementById('quotationImportHint');
+    var all = document.getElementById('qiSelectAll');
+    if (btn) btn.disabled = selectedCount === 0;
+    if (hint) {
+        hint.textContent = selectedCount > 0
+            ? selectedCount + ' quotation' + (selectedCount > 1 ? 's' : '') + ' selected for import.'
+            : 'Select at least one quotation to import its items.';
+    }
+    if (all) {
+        all.checked = filteredIds.length > 0 && selectedCount === filteredIds.length;
+        all.indeterminate = selectedCount > 0 && selectedCount < filteredIds.length;
+    }
+}
+
+function renderQuotationImportRows() {
+    var body = document.getElementById('quotationImportBody');
+    if (!body) return;
+
+    if (_quotationImportFiltered.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-sm text-slate-400">No quotations match the current filters.</td></tr>';
+        updateQuotationImportConfirmState();
+        return;
+    }
+
+    body.innerHTML = _quotationImportFiltered.map(function(q) {
+        var id = String(q.id);
+        var checked = _quotationImportSelection[id] ? ' checked' : '';
+        var desc = q.description && String(q.description).trim() !== '' ? q.description : '—';
+        return '' +
+            '<tr class="border-b border-slate-100 qi-row">' +
+                '<td class="px-2 py-3 align-middle">' +
+                    '<input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"' + checked +
+                    ' onchange="toggleQuotationImportSelection(\'' + id + '\', this.checked)">' +
+                '</td>' +
+                '<td class="px-2 py-3 font-medium text-slate-700">' + quotationImportEsc(q.quotation_no) + '</td>' +
+                '<td class="px-2 py-3 text-slate-600">' + quotationImportEsc(q.quotation_date_display || '') + '</td>' +
+                '<td class="px-2 py-3 text-slate-700">' + quotationImportEsc(q.customer_name || '') + '</td>' +
+                '<td class="px-2 py-3 text-slate-500">' + quotationImportEsc(q.ref_no || '-') + '</td>' +
+                '<td class="px-2 py-3 text-slate-600">' + quotationImportEsc(desc) + '</td>' +
+                '<td class="px-2 py-3 text-right text-slate-800 font-medium">RM ' + quotationImportMoney(q.total_amount) + '</td>' +
+                '<td class="px-2 py-3">' +
+                    '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Ready</span>' +
+                '</td>' +
+            '</tr>';
+    }).join('');
+
+    updateQuotationImportConfirmState();
+}
+
+function applyQuotationImportFilters() {
+    var customer = document.getElementById('qiCustomerFilter');
+    var dateFrom = document.getElementById('qiDateFromIso');
+    var dateTo = document.getElementById('qiDateToIso');
+    var customerVal = customer ? customer.value : '';
+    var fromVal = dateFrom ? dateFrom.value : '';
+    var toVal = dateTo ? dateTo.value : '';
+
+    if (fromVal && toVal && fromVal > toVal) return;
+
+    _quotationImportFiltered = QUOTATION_IMPORTS.filter(function(q) {
+        var okCustomer = !customerVal || q.customer_name === customerVal;
+        var okFrom = !fromVal || (q.quotation_date && q.quotation_date >= fromVal);
+        var okTo = !toVal || (q.quotation_date && q.quotation_date <= toVal);
+        return okCustomer && okFrom && okTo;
+    });
+
+    renderQuotationImportRows();
+}
+
+function autoApplyQuotationImportFiltersIfValid() {
+    var fromVal = (document.getElementById('qiDateFromIso') || {}).value || '';
+    var toVal = (document.getElementById('qiDateToIso') || {}).value || '';
+    if (fromVal && toVal && fromVal > toVal) return;
+    applyQuotationImportFilters();
+}
+
+function openQuotationImportModal() {
+    var modal = document.getElementById('quotationImportModal');
+    if (!modal) return;
+    populateQuotationImportCustomers();
+    var currentCustomer = '';
+    var invoiceCustomerHidden = document.getElementById('f_customer_name');
+    var invoiceCustomerInput = document.getElementById('customerSearchInput');
+    currentCustomer = (invoiceCustomerHidden && invoiceCustomerHidden.value) || (invoiceCustomerInput && invoiceCustomerInput.value) || '';
+    setQuotationCustomerFilter(currentCustomer);
+    applyQuotationImportFilters();
+    modal.style.display = 'flex';
+}
+
+function resetQuotationImportModal() {
+    _quotationImportSelection = {};
+    _quotationImportFiltered = [];
+    _quotationCustomerActiveIdx = -1;
+
+    var customerHidden = document.getElementById('qiCustomerFilter');
+    var customerInput = document.getElementById('qiCustomerInput');
+    var dateFrom = document.getElementById('qiDateFrom');
+    var dateFromIso = document.getElementById('qiDateFromIso');
+    var dateTo = document.getElementById('qiDateTo');
+    var dateToIso = document.getElementById('qiDateToIso');
+    var body = document.getElementById('quotationImportBody');
+    var hint = document.getElementById('quotationImportHint');
+    var confirmBtn = document.getElementById('quotationImportConfirmBtn');
+    var selectAll = document.getElementById('qiSelectAll');
+
+    if (customerHidden) customerHidden.value = '';
+    if (customerInput) customerInput.value = '';
+    if (dateFrom) dateFrom.value = '';
+    if (dateFromIso) dateFromIso.value = '';
+    if (dateTo) dateTo.value = '';
+    if (dateToIso) dateToIso.value = '';
+    if (body) body.innerHTML = '';
+    if (hint) hint.textContent = 'Select at least one quotation to import its items.';
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+
+    closeQuotationCustomerDropdown();
+}
+
+function closeQuotationImportModal() {
+    var modal = document.getElementById('quotationImportModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    resetQuotationImportModal();
+}
+
+function toggleQuotationImportSelection(id, checked) {
+    _quotationImportSelection[String(id)] = !!checked;
+    updateQuotationImportConfirmState();
+}
+
+function toggleQuotationImportSelectAll(checked) {
+    _quotationImportFiltered.forEach(function(q) {
+        _quotationImportSelection[String(q.id)] = !!checked;
+    });
+    renderQuotationImportRows();
+}
+
+function importQuotationItemRow(item) {
+    var type = item.row_type || 'item';
+    addRow(type);
+    var allItemRows = document.querySelectorAll('#itemsBody .item-row');
+    var mainRow = allItemRows[allItemRows.length - 1];
+    if (!mainRow) return;
+
+    if (type === 'subtitle') {
+        var subtitleInp = mainRow.querySelector('.item-desc-input');
+        if (subtitleInp) subtitleInp.value = item.description || '';
+        return;
+    }
+
+    if (type === 'subtotal') {
+        calcAll();
+        return;
+    }
+
+    var descRow = mainRow.nextElementSibling;
+    var productIdEl = mainRow.querySelector('.item-product-id');
+    var descEl = mainRow.querySelector('.item-desc-input');
+    var qtyEl = mainRow.querySelector('.item-qty');
+    var priceEl = mainRow.querySelector('.item-price');
+    var discRawEl = mainRow.querySelector('.item-disc-raw');
+    var taxEl = mainRow.querySelector('.item-tax');
+    var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
+    var classEl = descRow ? descRow.querySelector('.item-class') : null;
+
+    if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
+    if (descEl) {
+        descEl.value = item.description || '';
+        descEl._savedValue = descEl.value;
+        descEl.placeholder = 'Item name';
+    }
+    if (qtyEl) qtyEl.value = (parseFloat(item.quantity || 0) || 0).toFixed(2);
+    if (priceEl) priceEl.value = (parseFloat(item.unit_price || 0) || 0).toFixed(2);
+    if (discRawEl) {
+        var discVal = parseFloat(item.discount_pct || 0) || 0;
+        discRawEl.value = discVal > 0 ? (item.discount_mode === 'fixed' ? discVal.toFixed(2) : discVal.toFixed(2) + '%') : '';
+        formatDisc(discRawEl);
+    }
+    if (taxEl) {
+        taxEl.value = item.tax_type || '';
+        var taxDd = taxEl.closest('td');
+        if (taxDd && taxDd._x_dataStack && taxDd._x_dataStack[0]) {
+            taxDd._x_dataStack[0].value = item.tax_type || '';
+            taxDd._x_dataStack[0].open = false;
+        }
+    }
+    if (noteEl) noteEl.value = item.item_description || '';
+    if (classEl) classEl.value = item.classification || '';
+    if (descRow) {
+        var lhdnWrap = descRow.querySelector('[x-data]');
+        if (lhdnWrap && lhdnWrap._x_dataStack && lhdnWrap._x_dataStack[0]) {
+            lhdnWrap._x_dataStack[0].value = item.classification || '';
+            lhdnWrap._x_dataStack[0].q = '';
+            lhdnWrap._x_dataStack[0].open = false;
+        }
+    }
+
+    calcRow(mainRow);
+}
+
+function confirmQuotationImport() {
+    var selected = _quotationImportFiltered.filter(function(q) {
+        return !!_quotationImportSelection[String(q.id)];
+    });
+    if (selected.length === 0) return;
+
+    var importedCount = 0;
+    selected.forEach(function(q) {
+        (q.items || []).forEach(function(item) {
+            importQuotationItemRow(item);
+            importedCount++;
+        });
+    });
+
+    renumberRows();
+    calcAll();
+    closeQuotationImportModal();
+    showToast(importedCount + ' item line' + (importedCount !== 1 ? 's' : '') + ' imported from quotation.', 'success');
+}
+
+function selectImportItemsSource(source) {
+    closeImportItemsMenu();
+    if (source === 'quotation') {
+        openQuotationImportModal();
+        return;
+    }
+    var labels = {
+        sales_order: 'Sales Orders',
+        delivery_order: 'Delivery Orders'
+    };
+    showToast((labels[source] || 'Selected source') + ' import UI is ready. Next we can connect the actual import flow.', 'info');
+}
+
+document.addEventListener('click', function(e) {
+    var btn = document.getElementById('importItemsBtn');
+    var menu = document.getElementById('importItemsMenu');
+    if (!btn || !menu) return;
+    if (btn.contains(e.target) || menu.contains(e.target)) return;
+    closeImportItemsMenu();
+});
+
+document.addEventListener('click', function(e) {
+    var input = document.getElementById('qiCustomerInput');
+    var panel = document.getElementById('qiCustomerPanel');
+    if (!input || !panel) return;
+    if (input.contains(e.target) || panel.contains(e.target)) return;
+    closeQuotationCustomerDropdown();
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeQuotationImportModal();
+});
+
+(function() {
+    function initModalDatePicker(inputId, hiddenId) {
+        var input = document.getElementById(inputId);
+        var hidden = document.getElementById(hiddenId);
+        if (!input || !hidden) return;
+
+        var MONTHS_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var DAYS         = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+        var view = 'day';
+        var decadeStart = 0;
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function toDMY(d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); }
+        function toISO(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+        function parseISO(s) {
+            if (!s) return null;
+            var p = s.split('-');
+            return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null;
+        }
+
+        var current = parseISO(hidden.value);
+        var viewing = current ? new Date(current.getFullYear(), current.getMonth(), 1) : new Date();
+        var popup = document.createElement('div');
+        popup.className = 'dp-popup';
+        popup.style.zIndex = '10002';
+        document.body.appendChild(popup);
+
+        function pos() {
+            var r = input.getBoundingClientRect();
+            popup.style.top = (r.bottom + 6) + 'px';
+            popup.style.left = r.left + 'px';
+        }
+
+        var chevL = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>';
+        var chevR = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+        var dblL  = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>';
+        var dblR  = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>';
+
+        function close() {
+            popup.classList.remove('is-open');
+            view = 'day';
+        }
+
+        function renderDay() {
+            var today = new Date();
+            var y = viewing.getFullYear(), mo = viewing.getMonth();
+            var first = new Date(y, mo, 1).getDay();
+            var dim = new Date(y, mo + 1, 0).getDate();
+            var prev = new Date(y, mo, 0).getDate();
+            var cells = '';
+
+            for (var i = first - 1; i >= 0; i--) cells += '<button type="button" class="dp-day dp-other">' + (prev - i) + '</button>';
+            for (var d = 1; d <= dim; d++) {
+                var isT = (d === today.getDate() && mo === today.getMonth() && y === today.getFullYear());
+                var isS = current && d === current.getDate() && mo === current.getMonth() && y === current.getFullYear();
+                cells += '<button type="button" class="dp-day' + (isT ? ' dp-today' : '') + (isS ? ' dp-sel' : '') + '" data-day="' + d + '">' + d + '</button>';
+            }
+            var rem = (first + dim) % 7;
+            if (rem > 0) for (var d2 = 1; d2 <= 7 - rem; d2++) cells += '<button type="button" class="dp-day dp-other">' + d2 + '</button>';
+
+            popup.innerHTML = '<div class="dp-head"><button type="button" class="dp-nav-btn" data-nav="-1">' + chevL + '</button><button type="button" class="dp-title-btn" data-view="month">' + MONTHS_LONG[mo] + ' ' + y + '</button><button type="button" class="dp-nav-btn" data-nav="1">' + chevR + '</button></div><div class="dp-grid">' + DAYS.map(function(day){ return '<div class="dp-dow">' + day + '</div>'; }).join('') + cells + '</div><div class="dp-footer"><button type="button" class="dp-today-btn" data-today>Today</button>' + (current ? '<button type="button" class="dp-today-btn" style="color:#94a3b8" data-clear>Clear</button>' : '') + '</div>';
+            popup.querySelectorAll('[data-day]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    current = new Date(viewing.getFullYear(), viewing.getMonth(), +btn.dataset.day);
+                    input.value = toDMY(current);
+                    hidden.value = toISO(current);
+                    close();
+                    autoApplyQuotationImportFiltersIfValid();
+                });
+            });
+            popup.querySelectorAll('[data-nav]').forEach(function(btn) {
+                btn.addEventListener('click', function() { viewing.setMonth(viewing.getMonth() + (+btn.dataset.nav)); renderDay(); });
+            });
+            var vb = popup.querySelector('[data-view]');
+            if (vb) vb.addEventListener('click', function() { view = 'month'; renderMonth(); });
+            var tb = popup.querySelector('[data-today]');
+            if (tb) tb.addEventListener('click', function() {
+                current = new Date();
+                viewing = new Date(current.getFullYear(), current.getMonth(), 1);
+                input.value = toDMY(current);
+                hidden.value = toISO(current);
+                close();
+                autoApplyQuotationImportFiltersIfValid();
+            });
+            var cb = popup.querySelector('[data-clear]');
+            if (cb) cb.addEventListener('click', function() {
+                current = null;
+                input.value = '';
+                hidden.value = '';
+                close();
+                autoApplyQuotationImportFiltersIfValid();
+            });
+        }
+
+        function renderMonth() {
+            var y = viewing.getFullYear(), today = new Date();
+            var cells = MONTHS_SHORT.map(function(m, i) {
+                var isS = current && i === current.getMonth() && y === current.getFullYear();
+                var isC = i === today.getMonth() && y === today.getFullYear();
+                return '<button type="button" class="dp-mon-cell' + (isS ? ' dp-mon-sel' : '') + ((!isS && isC) ? ' dp-mon-cur' : '') + '" data-month="' + i + '">' + m + '</button>';
+            }).join('');
+            popup.innerHTML = '<div class="dp-head"><button type="button" class="dp-nav-btn" data-ystep="-1">' + chevL + '</button><button type="button" class="dp-title-btn" data-view="year">' + y + '</button><button type="button" class="dp-nav-btn" data-ystep="1">' + chevR + '</button></div><div class="dp-month-grid">' + cells + '</div>';
+            popup.querySelectorAll('[data-month]').forEach(function(btn) {
+                btn.addEventListener('click', function() { viewing.setMonth(+btn.dataset.month); view = 'day'; renderDay(); });
+            });
+            popup.querySelectorAll('[data-ystep]').forEach(function(btn) {
+                btn.addEventListener('click', function() { viewing.setFullYear(viewing.getFullYear() + (+btn.dataset.ystep)); renderMonth(); });
+            });
+            var vb = popup.querySelector('[data-view]');
+            if (vb) vb.addEventListener('click', function() { view = 'year'; decadeStart = Math.floor(viewing.getFullYear() / 10) * 10; renderYear(); });
+        }
+
+        function renderYear() {
+            if (!decadeStart) decadeStart = Math.floor(viewing.getFullYear() / 10) * 10;
+            var todayY = new Date().getFullYear(), cells = '';
+            for (var yr = decadeStart - 1; yr <= decadeStart + 10; yr++) {
+                var isOut = yr < decadeStart || yr > decadeStart + 9;
+                var isS = current && yr === current.getFullYear();
+                var isC = yr === todayY && !isS;
+                cells += '<button type="button" class="dp-yr-cell' + (isS ? ' dp-yr-sel' : '') + (isC ? ' dp-yr-cur' : '') + (isOut ? ' dp-yr-out' : '') + '"' + (isOut ? '' : ' data-year="' + yr + '"') + '>' + yr + '</button>';
+            }
+            popup.innerHTML = '<div class="dp-head"><button type="button" class="dp-nav-btn" data-decade="-1">' + dblL + '</button><span class="dp-title-btn" style="cursor:default">' + decadeStart + '–' + (decadeStart + 9) + '</span><button type="button" class="dp-nav-btn" data-decade="1">' + dblR + '</button></div><div class="dp-year-grid">' + cells + '</div>';
+            popup.querySelectorAll('[data-year]').forEach(function(btn) {
+                btn.addEventListener('click', function() { viewing.setFullYear(+btn.dataset.year); view = 'month'; renderMonth(); });
+            });
+            popup.querySelectorAll('[data-decade]').forEach(function(btn) {
+                btn.addEventListener('click', function() { decadeStart += (+btn.dataset.decade) * 10; renderYear(); });
+            });
+        }
+
+        popup.addEventListener('click', function(e) { e.stopPropagation(); });
+        input.addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.querySelectorAll('.dp-popup.is-open').forEach(function(p) { if (p !== popup) p.classList.remove('is-open'); });
+            if (popup.classList.contains('is-open')) close();
+            else {
+                viewing = current ? new Date(current.getFullYear(), current.getMonth(), 1) : new Date();
+                pos();
+                renderDay();
+                popup.classList.add('is-open');
+            }
+        });
+        document.addEventListener('click', function() { if (popup.classList.contains('is-open')) close(); });
+        window.addEventListener('scroll', function() { if (popup.classList.contains('is-open')) pos(); }, true);
+    }
+
+    function bootModalDatePickers() {
+        initModalDatePicker('qiDateFrom', 'qiDateFromIso');
+        initModalDatePicker('qiDateTo', 'qiDateToIso');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootModalDatePickers);
+    } else {
+        bootModalDatePickers();
+    }
+})();
+
 function openAddProduct() {
     var backdrop = document.getElementById('apBackdrop');
     var panel    = document.getElementById('apPanel');
