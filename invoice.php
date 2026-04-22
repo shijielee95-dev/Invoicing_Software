@@ -881,7 +881,7 @@ try {
 $quotationImports = [];
 try {
     $qRows = $pdo->query("
-        SELECT id, quotation_no, customer_name, quotation_date, description, total_amount, status
+        SELECT id, quotation_no, customer_name, quotation_date, description, total_amount, status, tax_mode
         FROM quotations
         ORDER BY quotation_date DESC, id DESC
     ")->fetchAll(PDO::FETCH_ASSOC);
@@ -924,7 +924,8 @@ try {
             'description'    => (string)($q['description'] ?? ''),
             'total_amount'   => (float)($q['total_amount'] ?? 0),
             'status'         => (string)($q['status'] ?? ''),
-            'import_status'  => 'Ready',
+            'import_status'  => 'Ready',
+            'tax_mode'       => (string)($q['tax_mode'] ?? 'exclusive'),
             'items'          => $itemsByQuotation[$qid] ?? [],
         ];
     }
@@ -1223,7 +1224,8 @@ const TAX_OPTIONS = <?php
     foreach ($taxRates as $t) $opts[] = ['value'=>(string)$t['id'], 'text'=>htmlspecialchars($t['name']).' ('.number_format((float)$t['rate'],2).'%)'];
     echo json_encode($opts);
 ?>;
-const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
+const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
+const ACTION = '<?= $action ?>';
 
 // Payment methods - defined early so Alpine x-data on payment rows can reference these
 // Returns payment terms from DB filtered by current payment mode
@@ -1779,11 +1781,11 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                 <!-- ROW 2: description note -->
                 <tr class="item-desc-row border-b border-slate-50 transition-colors">
                     <!-- # col handled by rowspan -->
-                    <td class="px-3 pb-2 pt-1" colspan="6">
+                    <td class="px-3 pb-2 pt-1">
                         <input type="text" name="items[<?= $i ?>][item_description]" value="<?= e($descNote) ?>"
                                placeholder="Description (optional)"
                                class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-slate-600 focus:outline-none focus:border-indigo-500 transition placeholder-slate-300">
-                    </td>
+                    </td><td class="px-2 pb-2 pt-1"></td><td class="px-2 pb-2 pt-1"></td><td class="px-2 pb-2 pt-1"></td><td class="px-2 pb-2 pt-1"></td><td class="px-2 pb-2 pt-1"></td>
                     <!-- delete col handled by rowspan -->
                 </tr>
 
@@ -2824,10 +2826,15 @@ function addRow(type) {
     var tr2 = document.createElement('tr');
     tr2.className = 'item-desc-row border-b border-slate-50 transition-colors';
     tr2.innerHTML =
-        '<td class="px-3 pb-2 pt-1" colspan="6">'+
+        '<td class="px-3 pb-2 pt-1">'+
             '<input type="text" name="items['+rowIndex+'][item_description]" placeholder="Description (optional)" '+
             'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-slate-600 focus:outline-none focus:border-indigo-500 transition placeholder-slate-300">'+
-        '</td>';
+        '</td>'+
+        '<td class="px-2 pb-2 pt-1"></td>'+
+        '<td class="px-2 pb-2 pt-1"></td>'+
+        '<td class="px-2 pb-2 pt-1"></td>'+
+        '<td class="px-2 pb-2 pt-1"></td>'+
+        '<td class="px-2 pb-2 pt-1"></td>';
 
     tbody.appendChild(tr);
     tbody.appendChild(tr2);
@@ -6057,79 +6064,111 @@ function renderQuotationTransferModal() {
     if (btn) btn.disabled = selectedCount === 0;
 }
 
-function confirmQuotationTransfer() {
-    var importedCount = 0;
-    _quotationTransferOrder.forEach(function(qid) {
-        var q = _quotationTransferQuotes[qid];
-        if (!q) return;
-        quotationTransferNormalItems(q).forEach(function(entry) {
-            var key = quotationTransferKey(qid, entry.idx);
-            var state = _quotationTransferItems[key];
-            if (!state || !state.selected) return;
-            var qty = parseFloat(state.applyQty || 0);
-            if (!isFinite(qty) || qty <= 0) return;
-            var itemCopy = Object.assign({}, entry.item, { quantity: qty });
-            importQuotationItemRow(itemCopy);
-            importedCount++;
-        });
-    });
-    if (importedCount === 0) return;
-    renumberRows();
-    calcAll();
-    closeQuotationTransferModal(true);
+function confirmQuotationTransfer() {
+    if (ACTION === 'new' && _quotationTransferOrder.length > 0) {
+        var firstQid = _quotationTransferOrder[0];
+        var firstQ = _quotationTransferQuotes[firstQid];
+        if (firstQ && firstQ.tax_mode) {
+            setTaxMode(firstQ.tax_mode);
+        }
+    }
+    var importedCount = 0;
+    _quotationTransferOrder.forEach(function(qid) {
+        var q = _quotationTransferQuotes[qid];
+        if (!q) return;
+        quotationTransferNormalItems(q).forEach(function(entry) {
+            var key = quotationTransferKey(qid, entry.idx);
+            var state = _quotationTransferItems[key];
+            if (!state || !state.selected) return;
+            var qty = parseFloat(state.applyQty || 0);
+            if (!isFinite(qty) || qty <= 0) return;
+            var itemCopy = Object.assign({}, entry.item, { quantity: qty, quotation_quantity: (entry.item.quantity || 0) });
+            importQuotationItemRow(itemCopy);
+            importedCount++;
+        });
+    });
+    if (importedCount === 0) return;
+    renumberRows();
+    updateTotals();
+    
+    // Direct modal close
+    var m1 = document.getElementById('quotationTransferModal');
+    if (m1) m1.style.display = 'none';
+    var m2 = document.getElementById('quotationImportModal');
+    if (m2) m2.style.display = 'none';
+    
+    // Also reset transfer state for next time
+    resetQuotationTransferState();
+    renderQuotationTransferModal();
+
     showToast(importedCount + ' item line' + (importedCount !== 1 ? 's' : '') + ' imported from quotation.', 'success');
 }
 
-function importQuotationItemRow(item) {
-    var type = item.row_type || 'item';
-    addRow(type);
-    var allItemRows = document.querySelectorAll('#itemsBody .item-row');
-    var mainRow = allItemRows[allItemRows.length - 1];
-    if (!mainRow) return;
-
-    if (type === 'subtitle') {
-        var subtitleInp = mainRow.querySelector('.item-desc-input');
-        if (subtitleInp) subtitleInp.value = item.description || '';
-        return;
-    }
-
-    if (type === 'subtotal') {
-        calcAll();
-        return;
-    }
-
-    var descRow = mainRow.nextElementSibling;
-    var productIdEl = mainRow.querySelector('.item-product-id');
-    var descEl = mainRow.querySelector('.item-desc-input');
-    var qtyEl = mainRow.querySelector('.item-qty');
-    var priceEl = mainRow.querySelector('.item-price');
-    var discRawEl = mainRow.querySelector('.item-disc-raw');
-    var taxEl = mainRow.querySelector('.item-tax');
-    var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
-
-    if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
-    if (descEl) {
-        descEl.value = item.description || '';
-        descEl._savedValue = descEl.value;
-        descEl.placeholder = 'Item name';
-    }
-    if (qtyEl) qtyEl.value = (parseFloat(item.quantity || 0) || 0).toFixed(2);
-    if (priceEl) priceEl.value = (parseFloat(item.unit_price || 0) || 0).toFixed(2);
-    if (discRawEl) {
-        var discVal = parseFloat(item.discount_pct || 0) || 0;
-        discRawEl.value = discVal > 0 ? (item.discount_mode === 'fixed' ? discVal.toFixed(2) : discVal.toFixed(2) + '%') : '';
-        formatDisc(discRawEl);
-    }
-    if (taxEl) {
-        taxEl.value = item.tax_type || '';
-        var taxDd = taxEl.closest('td');
-        if (taxDd && taxDd._x_dataStack && taxDd._x_dataStack[0]) {
-            taxDd._x_dataStack[0].value = item.tax_type || '';
-            taxDd._x_dataStack[0].open = false;
-        }
-    }
-    if (noteEl) noteEl.value = item.item_description || '';
-
+function importQuotationItemRow(item) {
+    var type = item.row_type || 'item';
+    addRow(type);
+    var allItemRows = document.querySelectorAll('#itemsBody .item-row');
+    var mainRow = allItemRows[allItemRows.length - 1];
+    if (!mainRow) return;
+
+    if (type === 'subtitle') {
+        var subtitleInp = mainRow.querySelector('.item-desc-input');
+        if (subtitleInp) subtitleInp.value = item.description || '';
+        return;
+    }
+
+    if (type === 'subtotal') {
+        updateTotals();
+        return;
+    }
+
+    var descRow = mainRow.nextElementSibling;
+    var productIdEl = mainRow.querySelector('.item-product-id');
+    var descEl = mainRow.querySelector('.item-desc-input');
+    var qtyEl = mainRow.querySelector('.item-qty');
+    var priceEl = mainRow.querySelector('.item-price');
+    var discRawEl = mainRow.querySelector('.item-disc-raw');
+    var taxEl = mainRow.querySelector('.item-tax');
+    var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
+
+    if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
+    if (descEl) {
+        descEl.value = item.description || '';
+        descEl._savedValue = descEl.value;
+        descEl.placeholder = 'Item name';
+    }
+    if (qtyEl) qtyEl.value = (parseFloat(item.quantity || 0) || 0).toFixed(2);
+    if (priceEl) priceEl.value = (parseFloat(item.unit_price || 0) || 0).toFixed(2);
+    if (discRawEl) {
+        var discVal = parseFloat(item.discount_pct || 0) || 0;
+        var qQty    = parseFloat(item.quotation_quantity || 0) || 0;
+        var iQty    = parseFloat(item.quantity || 0) || 0;
+        if (item.discount_mode === 'fixed' && qQty > 0 && iQty < qQty) {
+            discVal = (discVal / qQty) * iQty;
+        }
+        discRawEl.value = discVal > 0 ? (item.discount_mode === 'fixed' ? discVal.toFixed(2) : discVal.toFixed(2) + '%') : '';
+        formatDisc(discRawEl);
+    }
+    
+    if (taxEl) {
+        var tval = (item.tax_type === 'none' || !item.tax_type) ? '' : String(item.tax_type);
+        var updateTax = function() {
+            taxEl.value = tval;
+            var taxDd = taxEl.closest('td');
+            if (taxDd && taxDd._x_dataStack && taxDd._x_dataStack[0]) {
+                taxDd._x_dataStack[0].value = tval;
+                taxDd._x_dataStack[0].open = false;
+            }
+            taxEl.dispatchEvent(new Event('change', { bubbles: true }));
+            calcRow(mainRow);
+        };
+        updateTax();
+        // Alpine might take a moment to initialize the newly added row
+        setTimeout(updateTax, 50);
+    }
+
+    if (noteEl) noteEl.value = item.item_description || '';
+
     calcRow(mainRow);
 }
 
