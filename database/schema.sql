@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS company_profiles (
     id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     company_name     VARCHAR(255) NOT NULL DEFAULT '',
     company_tin      VARCHAR(50)  NOT NULL DEFAULT '',
-    id_type          ENUM('NRIC','BRN','ARMY','PASSPORT') DEFAULT 'BRN',
+    id_type          ENUM('NRIC','BRN','ARMY','PASSPORT','NA') DEFAULT 'BRN',
     id_no            VARCHAR(100) NOT NULL DEFAULT '',
+    currency         CHAR(3)      NOT NULL DEFAULT 'MYR',
     sst_no           VARCHAR(100) DEFAULT '',
     tourism_tax_no   VARCHAR(100) DEFAULT '',
     msic_code        VARCHAR(20)  NOT NULL DEFAULT '',
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     tax_amount      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     total_amount    DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     currency        CHAR(3)       NOT NULL DEFAULT 'MYR',
+    rate            DECIMAL(13,5) NOT NULL DEFAULT 1.00000,
     -- Invoice meta
     notes           TEXT,
     status          ENUM('draft','sent','paid','overdue','cancelled') NOT NULL DEFAULT 'draft',

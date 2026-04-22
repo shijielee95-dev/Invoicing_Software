@@ -34,8 +34,9 @@ $tables = [
     id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     company_name      VARCHAR(255) NOT NULL DEFAULT '',
     company_tin       VARCHAR(50)  NOT NULL DEFAULT '',
-    id_type           ENUM('NRIC','BRN','ARMY','PASSPORT') DEFAULT 'BRN',
+    id_type           ENUM('NRIC','BRN','ARMY','PASSPORT','NA') DEFAULT 'BRN',
     id_no             VARCHAR(100) NOT NULL DEFAULT '',
+    currency          CHAR(3)      NOT NULL DEFAULT 'MYR',
     sst_no            VARCHAR(100) DEFAULT '',
     tourism_tax_no    VARCHAR(100) DEFAULT '',
     msic_code         VARCHAR(20)  NOT NULL DEFAULT '',
@@ -107,6 +108,7 @@ $tables = [
     rounding_adjustment DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     total_amount        DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     currency            CHAR(3)       NOT NULL DEFAULT 'MYR',
+    rate                DECIMAL(13,5) NOT NULL DEFAULT 1.00000,
     tax_mode            ENUM('inclusive','exclusive') NOT NULL DEFAULT 'exclusive',
     description         VARCHAR(500)  DEFAULT '',
     internal_note       VARCHAR(500)  DEFAULT '',
@@ -473,6 +475,28 @@ try {
     // ignore if already widened
 }
 
+// ── 1d. Update company_profiles.id_type ENUM ──────────────────────────────
+try {
+    $pdo->exec("ALTER TABLE company_profiles MODIFY COLUMN id_type ENUM('NRIC','BRN','ARMY','PASSPORT','NA') DEFAULT 'BRN'");
+    $success[] = "company_profiles.id_type — updated ENUM to include 'NA'";
+} catch (PDOException $e) {
+    $errors[] = "company_profiles.id_type: " . $e->getMessage();
+}
+
+// ── 1e. Add company_profiles.currency column ──────────────────────────────
+try {
+    $chk = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='company_profiles' AND COLUMN_NAME='currency'");
+    $chk->execute();
+    if (!(int)$chk->fetchColumn()) {
+        $pdo->exec("ALTER TABLE company_profiles ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'MYR' AFTER id_no");
+        $success[] = "company_profiles.currency — added";
+    } else {
+        $success[] = "company_profiles.currency — already exists, skipped";
+    }
+} catch (PDOException $e) {
+    $errors[] = "company_profiles.currency: " . $e->getMessage();
+}
+
 // ── 2. ALTER existing invoices table (safe — adds only if column missing) ──
 
 $alterColumns = [
@@ -485,6 +509,7 @@ $alterColumns = [
     'internal_note'       => "ALTER TABLE invoices ADD COLUMN internal_note       VARCHAR(500)  DEFAULT ''",
     'rounding_adjustment' => "ALTER TABLE invoices ADD COLUMN rounding_adjustment DECIMAL(10,2) NOT NULL DEFAULT 0.00",
     'tax_mode'            => "ALTER TABLE invoices ADD COLUMN tax_mode            ENUM('inclusive','exclusive') NOT NULL DEFAULT 'exclusive'",
+    'rate'                => "ALTER TABLE invoices ADD COLUMN rate                DECIMAL(13,5) NOT NULL DEFAULT 1.00000",
     'payment_mode'        => "ALTER TABLE invoices ADD COLUMN payment_mode        ENUM('cash','credit') NOT NULL DEFAULT 'cash'",
     'due_date'            => "ALTER TABLE invoices ADD COLUMN due_date            DATE          DEFAULT NULL",
     'payment_term_id'     => "ALTER TABLE invoices ADD COLUMN payment_term_id     INT UNSIGNED  DEFAULT NULL",

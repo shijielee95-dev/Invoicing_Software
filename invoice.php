@@ -6,6 +6,8 @@ include 'includes/dropdown.php';
 
 
 $pdo    = db();
+$company = $pdo->query("SELECT currency FROM company_profiles WHERE id = 1")->fetch();
+$baseCurrency = $company['currency'] ?? 'MYR';
 $action = $_GET['action'] ?? 'list';  // list | new | edit
 $invoiceCustomFields = []; // default - populated in form branch
 
@@ -924,7 +926,7 @@ try {
             'description'    => (string)($q['description'] ?? ''),
             'total_amount'   => (float)($q['total_amount'] ?? 0),
             'status'         => (string)($q['status'] ?? ''),
-            'import_status'  => 'Ready',
+            'import_status'  => 'Ready',
             'tax_mode'       => (string)($q['tax_mode'] ?? 'exclusive'),
             'items'          => $itemsByQuotation[$qid] ?? [],
         ];
@@ -1224,7 +1226,7 @@ const TAX_OPTIONS = <?php
     foreach ($taxRates as $t) $opts[] = ['value'=>(string)$t['id'], 'text'=>htmlspecialchars($t['name']).' ('.number_format((float)$t['rate'],2).'%)'];
     echo json_encode($opts);
 ?>;
-const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
+const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
 const ACTION = '<?= $action ?>';
 
 // Payment methods - defined early so Alpine x-data on payment rows can reference these
@@ -1468,47 +1470,56 @@ var _customerPaymentTermName = '';
                     <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 </div>
             </div>
-            <div>
-                <label class="<?= t('label') ?>">Currency <span class="text-red-400">*</span></label>
-                <div id="invoiceCurrencyDd" x-data="invoiceCurrencyComp('<?= e($editMode ? $inv['currency'] : 'MYR') ?>')" class="relative">
-                    <!-- Trigger -->
-                    <div class="relative">
-                        <input type="text" id="invoiceCurrencyInput"
-                               :value="open ? q : selected.label"
-                               @focus="onFocus()"
-                               @input="q=$event.target.value; activeIdx=-1"
-                               @blur="onBlur()"
-                               @keydown.escape="open=false; q=''; $nextTick(function(){ var el=document.getElementById('invoiceCurrencyInput'); if(el){ el.value=selected.label; el.blur(); } })"
-                               @keydown.arrow-down.prevent="moveDown()"
-                               @keydown.arrow-up.prevent="moveUp()"
-                               @keydown.enter.prevent="pickActive()"
-                               placeholder="Search currency..."
-                               autocomplete="off"
-                               class="<?= t('input') ?> pr-8">
-                        <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
-                             :class="open ? 'rotate-180' : ''"
-                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M19 9l-7 7-7-7"/>
-                        </svg>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="<?= t('label') ?>">Currency <span class="text-red-400">*</span></label>
+                    <div id="invoiceCurrencyDd" x-data="invoiceCurrencyComp('<?= e($editMode ? $inv['currency'] : $baseCurrency) ?>', '<?= e($baseCurrency) ?>', <?= $editMode ? (float)$inv['rate'] : 1.0 ?>)" class="relative">
+                        <!-- Trigger -->
+                        <div class="relative">
+                            <input type="text" id="invoiceCurrencyInput"
+                                   :value="open ? q : selected.label"
+                                   @focus="onFocus()"
+                                   @input="q=$event.target.value; activeIdx=-1"
+                                   @blur="onBlur()"
+                                   @keydown.escape="open=false; q=''; $nextTick(function(){ var el=document.getElementById('invoiceCurrencyInput'); if(el){ el.value=selected.label; el.blur(); } })"
+                                   @keydown.arrow-down.prevent="moveDown()"
+                                   @keydown.arrow-up.prevent="moveUp()"
+                                   @keydown.enter.prevent="pickActive()"
+                                   placeholder="Search currency..."
+                                   autocomplete="off"
+                                   class="<?= t('input') ?> pr-8">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
+                                 :class="open ? 'rotate-180' : ''"
+                                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                        <!-- Dropdown -->
+                        <div x-show="open && filtered.length" @mousedown.prevent style="display:none"
+                             class="absolute z-[9996] left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                            <ul class="max-h-52 overflow-y-auto py-1" x-ref="list">
+                                <template x-for="(c, i) in filtered" :key="c.code">
+                                    <li>
+                                        <button type="button"
+                                                @mousedown.prevent="pick(c)"
+                                                class="w-full text-left px-3 py-1.5 text-sm transition-colors"
+                                                :class="i===activeIdx ? 'bg-indigo-50 text-indigo-700 font-medium' : (c.code===selected.code ? 'bg-slate-50 text-slate-700 font-medium' : 'text-slate-800 hover:bg-slate-50')">
+                                            <span class="font-mono text-xs font-semibold" x-text="c.code"></span>
+                                            <span class="ml-2 text-slate-500" x-text="c.name"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                        <input type="hidden" name="currency" :value="selected.code">
                     </div>
-                    <!-- Dropdown -->
-                    <div x-show="open && filtered.length" @mousedown.prevent style="display:none"
-                         class="absolute z-[9996] left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-                        <ul class="max-h-52 overflow-y-auto py-1" x-ref="list">
-                            <template x-for="(c, i) in filtered" :key="c.code">
-                                <li>
-                                    <button type="button"
-                                            @mousedown.prevent="pick(c)"
-                                            class="w-full text-left px-3 py-1.5 text-sm transition-colors"
-                                            :class="i===activeIdx ? 'bg-indigo-50 text-indigo-700 font-medium' : (c.code===selected.code ? 'bg-slate-50 text-slate-700 font-medium' : 'text-slate-800 hover:bg-slate-50')">
-                                        <span class="font-mono text-xs font-semibold" x-text="c.code"></span>
-                                        <span class="ml-2 text-slate-500" x-text="c.name"></span>
-                                    </button>
-                                </li>
-                            </template>
-                        </ul>
-                    </div>
-                    <input type="hidden" name="currency" :value="selected.code">
+                </div>
+                <div>
+                    <label class="<?= t('label') ?>">Rate <span class="text-red-400">*</span></label>
+                    <input type="number" name="rate" x-model="rate" step="0.00001"
+                           :disabled="selected.code === baseCurrency"
+                           :class="selected.code === baseCurrency ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''"
+                           class="<?= t('input') ?>">
                 </div>
             </div>
             <div>
@@ -3727,13 +3738,16 @@ var INVOICE_CURRENCIES = [
 ];
 
 
-function invoiceCurrencyComp(initialCode) {
+function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
     var sorted = INVOICE_CURRENCIES.slice().sort(function(a, b) {
         return a.name.localeCompare(b.name);
     });
-    // Keep MYR first
-    sorted = sorted.filter(function(c){ return c.code !== 'MYR'; });
-    sorted.unshift(INVOICE_CURRENCIES.find(function(c){ return c.code === 'MYR'; }));
+    // Keep base currency first
+    var baseCurObj = INVOICE_CURRENCIES.find(function(c){ return c.code === baseCurrency; });
+    if (baseCurObj) {
+        sorted = sorted.filter(function(c){ return c.code !== baseCurrency; });
+        sorted.unshift(baseCurObj);
+    }
 
     var def = sorted.find(function(c){ return c.code === initialCode; }) || sorted[0];
     return {
@@ -3741,6 +3755,8 @@ function invoiceCurrencyComp(initialCode) {
         open:      false,
         activeIdx: -1,
         selected:  { code: def.code, label: def.code + ' - ' + def.name },
+        baseCurrency: baseCurrency,
+        rate:      initialRate || 1.0,
         currencies: sorted,
         get filtered() {
             var q = this.q.trim().toLowerCase();
@@ -6064,111 +6080,111 @@ function renderQuotationTransferModal() {
     if (btn) btn.disabled = selectedCount === 0;
 }
 
-function confirmQuotationTransfer() {
-    if (ACTION === 'new' && _quotationTransferOrder.length > 0) {
-        var firstQid = _quotationTransferOrder[0];
-        var firstQ = _quotationTransferQuotes[firstQid];
-        if (firstQ && firstQ.tax_mode) {
-            setTaxMode(firstQ.tax_mode);
-        }
-    }
-    var importedCount = 0;
-    _quotationTransferOrder.forEach(function(qid) {
-        var q = _quotationTransferQuotes[qid];
-        if (!q) return;
-        quotationTransferNormalItems(q).forEach(function(entry) {
-            var key = quotationTransferKey(qid, entry.idx);
-            var state = _quotationTransferItems[key];
-            if (!state || !state.selected) return;
-            var qty = parseFloat(state.applyQty || 0);
-            if (!isFinite(qty) || qty <= 0) return;
-            var itemCopy = Object.assign({}, entry.item, { quantity: qty, quotation_quantity: (entry.item.quantity || 0) });
-            importQuotationItemRow(itemCopy);
-            importedCount++;
-        });
-    });
-    if (importedCount === 0) return;
-    renumberRows();
-    updateTotals();
-    
-    // Direct modal close
-    var m1 = document.getElementById('quotationTransferModal');
-    if (m1) m1.style.display = 'none';
-    var m2 = document.getElementById('quotationImportModal');
-    if (m2) m2.style.display = 'none';
-    
-    // Also reset transfer state for next time
-    resetQuotationTransferState();
-    renderQuotationTransferModal();
-
+function confirmQuotationTransfer() {
+    if (ACTION === 'new' && _quotationTransferOrder.length > 0) {
+        var firstQid = _quotationTransferOrder[0];
+        var firstQ = _quotationTransferQuotes[firstQid];
+        if (firstQ && firstQ.tax_mode) {
+            setTaxMode(firstQ.tax_mode);
+        }
+    }
+    var importedCount = 0;
+    _quotationTransferOrder.forEach(function(qid) {
+        var q = _quotationTransferQuotes[qid];
+        if (!q) return;
+        quotationTransferNormalItems(q).forEach(function(entry) {
+            var key = quotationTransferKey(qid, entry.idx);
+            var state = _quotationTransferItems[key];
+            if (!state || !state.selected) return;
+            var qty = parseFloat(state.applyQty || 0);
+            if (!isFinite(qty) || qty <= 0) return;
+            var itemCopy = Object.assign({}, entry.item, { quantity: qty, quotation_quantity: (entry.item.quantity || 0) });
+            importQuotationItemRow(itemCopy);
+            importedCount++;
+        });
+    });
+    if (importedCount === 0) return;
+    renumberRows();
+    updateTotals();
+    
+    // Direct modal close
+    var m1 = document.getElementById('quotationTransferModal');
+    if (m1) m1.style.display = 'none';
+    var m2 = document.getElementById('quotationImportModal');
+    if (m2) m2.style.display = 'none';
+    
+    // Also reset transfer state for next time
+    resetQuotationTransferState();
+    renderQuotationTransferModal();
+
     showToast(importedCount + ' item line' + (importedCount !== 1 ? 's' : '') + ' imported from quotation.', 'success');
 }
 
-function importQuotationItemRow(item) {
-    var type = item.row_type || 'item';
-    addRow(type);
-    var allItemRows = document.querySelectorAll('#itemsBody .item-row');
-    var mainRow = allItemRows[allItemRows.length - 1];
-    if (!mainRow) return;
-
-    if (type === 'subtitle') {
-        var subtitleInp = mainRow.querySelector('.item-desc-input');
-        if (subtitleInp) subtitleInp.value = item.description || '';
-        return;
-    }
-
-    if (type === 'subtotal') {
-        updateTotals();
-        return;
-    }
-
-    var descRow = mainRow.nextElementSibling;
-    var productIdEl = mainRow.querySelector('.item-product-id');
-    var descEl = mainRow.querySelector('.item-desc-input');
-    var qtyEl = mainRow.querySelector('.item-qty');
-    var priceEl = mainRow.querySelector('.item-price');
-    var discRawEl = mainRow.querySelector('.item-disc-raw');
-    var taxEl = mainRow.querySelector('.item-tax');
-    var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
-
-    if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
-    if (descEl) {
-        descEl.value = item.description || '';
-        descEl._savedValue = descEl.value;
-        descEl.placeholder = 'Item name';
-    }
-    if (qtyEl) qtyEl.value = (parseFloat(item.quantity || 0) || 0).toFixed(2);
-    if (priceEl) priceEl.value = (parseFloat(item.unit_price || 0) || 0).toFixed(2);
-    if (discRawEl) {
-        var discVal = parseFloat(item.discount_pct || 0) || 0;
-        var qQty    = parseFloat(item.quotation_quantity || 0) || 0;
-        var iQty    = parseFloat(item.quantity || 0) || 0;
-        if (item.discount_mode === 'fixed' && qQty > 0 && iQty < qQty) {
-            discVal = (discVal / qQty) * iQty;
-        }
-        discRawEl.value = discVal > 0 ? (item.discount_mode === 'fixed' ? discVal.toFixed(2) : discVal.toFixed(2) + '%') : '';
-        formatDisc(discRawEl);
-    }
-    
-    if (taxEl) {
-        var tval = (item.tax_type === 'none' || !item.tax_type) ? '' : String(item.tax_type);
-        var updateTax = function() {
-            taxEl.value = tval;
-            var taxDd = taxEl.closest('td');
-            if (taxDd && taxDd._x_dataStack && taxDd._x_dataStack[0]) {
-                taxDd._x_dataStack[0].value = tval;
-                taxDd._x_dataStack[0].open = false;
-            }
-            taxEl.dispatchEvent(new Event('change', { bubbles: true }));
-            calcRow(mainRow);
-        };
-        updateTax();
-        // Alpine might take a moment to initialize the newly added row
-        setTimeout(updateTax, 50);
-    }
-
-    if (noteEl) noteEl.value = item.item_description || '';
-
+function importQuotationItemRow(item) {
+    var type = item.row_type || 'item';
+    addRow(type);
+    var allItemRows = document.querySelectorAll('#itemsBody .item-row');
+    var mainRow = allItemRows[allItemRows.length - 1];
+    if (!mainRow) return;
+
+    if (type === 'subtitle') {
+        var subtitleInp = mainRow.querySelector('.item-desc-input');
+        if (subtitleInp) subtitleInp.value = item.description || '';
+        return;
+    }
+
+    if (type === 'subtotal') {
+        updateTotals();
+        return;
+    }
+
+    var descRow = mainRow.nextElementSibling;
+    var productIdEl = mainRow.querySelector('.item-product-id');
+    var descEl = mainRow.querySelector('.item-desc-input');
+    var qtyEl = mainRow.querySelector('.item-qty');
+    var priceEl = mainRow.querySelector('.item-price');
+    var discRawEl = mainRow.querySelector('.item-disc-raw');
+    var taxEl = mainRow.querySelector('.item-tax');
+    var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
+
+    if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
+    if (descEl) {
+        descEl.value = item.description || '';
+        descEl._savedValue = descEl.value;
+        descEl.placeholder = 'Item name';
+    }
+    if (qtyEl) qtyEl.value = (parseFloat(item.quantity || 0) || 0).toFixed(2);
+    if (priceEl) priceEl.value = (parseFloat(item.unit_price || 0) || 0).toFixed(2);
+    if (discRawEl) {
+        var discVal = parseFloat(item.discount_pct || 0) || 0;
+        var qQty    = parseFloat(item.quotation_quantity || 0) || 0;
+        var iQty    = parseFloat(item.quantity || 0) || 0;
+        if (item.discount_mode === 'fixed' && qQty > 0 && iQty < qQty) {
+            discVal = (discVal / qQty) * iQty;
+        }
+        discRawEl.value = discVal > 0 ? (item.discount_mode === 'fixed' ? discVal.toFixed(2) : discVal.toFixed(2) + '%') : '';
+        formatDisc(discRawEl);
+    }
+    
+    if (taxEl) {
+        var tval = (item.tax_type === 'none' || !item.tax_type) ? '' : String(item.tax_type);
+        var updateTax = function() {
+            taxEl.value = tval;
+            var taxDd = taxEl.closest('td');
+            if (taxDd && taxDd._x_dataStack && taxDd._x_dataStack[0]) {
+                taxDd._x_dataStack[0].value = tval;
+                taxDd._x_dataStack[0].open = false;
+            }
+            taxEl.dispatchEvent(new Event('change', { bubbles: true }));
+            calcRow(mainRow);
+        };
+        updateTax();
+        // Alpine might take a moment to initialize the newly added row
+        setTimeout(updateTax, 50);
+    }
+
+    if (noteEl) noteEl.value = item.item_description || '';
+
     calcRow(mainRow);
 }
 

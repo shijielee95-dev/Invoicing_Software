@@ -25,6 +25,7 @@ $invoiceNo          = trim($_POST['invoice_no']          ?? '');
 $referenceNo        = trim($_POST['reference_no']        ?? '');
 $status             = $_POST['status']                    ?? 'draft';
 $currency           = $_POST['currency']                  ?? 'MYR';
+$rate               = (float)($_POST['rate']              ?? 1.0);
 $taxMode            = $_POST['tax_mode']                  ?? 'exclusive';
 $roundingAdj        = (float)($_POST['rounding_adjustment'] ?? 0);
 
@@ -362,6 +363,7 @@ try {
         'rounding_adjustment' => $roundingAdj,
         'total_amount'        => $serverTotal,
         'currency'            => $currency,
+        'rate'                => $rate,
         'tax_mode'            => $taxMode,
         'description'         => $description,
         'internal_note'       => $internalNote,
@@ -456,6 +458,7 @@ try {
                 'invoice_date'     => $oldData['invoice_date'] ?? '',
                 'due_date'         => $oldData['due_date'] ?? '',
                 'currency'         => $oldData['currency'] ?? 'MYR',
+                'rate'             => round((float)($oldData['rate'] ?? 1.0), 5),
                 'status'           => $oldData['status'],
                 'payment_mode'     => $oldData['payment_mode'] ?? 'cash',
                 'payment_term_id'  => $oldData['payment_term_id'] ?? null,
@@ -485,6 +488,7 @@ try {
                 'invoice_date'     => $invoiceDate,
                 'due_date'         => $auditDue,
                 'currency'         => $currency,
+                'rate'             => $rate,
                 'status'           => $status,
                 'payment_mode'     => $paymentMode,
                 'payment_term_id'  => $paymentTermId,

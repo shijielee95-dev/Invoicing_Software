@@ -21,6 +21,7 @@ $saveError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $idType = trim($_POST['id_type'] ?? '');
+        $currency = trim($_POST['currency'] ?? 'MYR');
 
         // SST/Tourism: store NA if empty
         $sstNo         = trim($_POST['sst_no']         ?? '');
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'company_tin'       => trim($_POST['company_tin']                ?? ''),
             'id_type'           => $idType,
             'id_no'             => strtoupper(trim($_POST['id_no']           ?? '')),
+            'currency'          => $currency,
             'tin_no'            => strtoupper(trim($_POST['tin_no']           ?? '')),
             'sst_no'            => strtoupper($sstNo),
             'tourism_tax_no'    => strtoupper($tourismTaxNo),
@@ -104,8 +106,11 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
 <?php endif; ?>
 
 <style>
-/* ── Country combobox scroll fix ── */
-#companyCountryPanel { position:fixed !important; }
+/* ── Panel overlay fix ── */
+#companyCountryPanel, #companyCurrencyPanel { 
+    position: fixed !important; 
+    z-index: 9999 !important;
+}
 </style>
 
 <form method="POST" id="companyForm" enctype="multipart/form-data" novalidate
@@ -189,6 +194,59 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
                 </div>
 
                 <div>
+                    <label class="<?= t('label') ?>">Base Currency <span class="text-red-400">*</span></label>
+                    <div id="companyCurrencyDd" x-data="companyCurrencyComp('<?= e($c['currency'] ?? 'MYR') ?>')" class="relative">
+                        <div class="relative">
+                            <input type="text" id="companyCurrencyInput"
+                                   :value="open ? q : selected.label"
+                                   @focus="onFocus()"
+                                   @input="q=$event.target.value; activeIdx=-1"
+                                   @blur="onBlur()"
+                                   @keydown.escape="$el.blur()"
+                                   @keydown.arrow-down.prevent="moveDown()"
+                                   @keydown.arrow-up.prevent="moveUp()"
+                                   @keydown.enter.prevent="pickActive()"
+                                   placeholder="Search currency..."
+                                   autocomplete="off"
+                                   class="<?= t('input') ?> pr-8">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
+                                 :class="open ? 'rotate-180' : ''"
+                                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                        <div id="companyCurrencyPanel"
+                             x-show="open && filtered.length"
+                             @mousedown.prevent
+                             style="display:none;z-index:9998"
+                             x-init="$watch('open', function(v) {
+                                 if (v) {
+                                     var r = $el.previousElementSibling.getBoundingClientRect();
+                                     $el.style.top   = (r.bottom + 4) + 'px';
+                                     $el.style.left  = r.left + 'px';
+                                     $el.style.width = r.width + 'px';
+                                 }
+                             })"
+                             class="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                            <ul class="max-h-52 overflow-y-auto py-1" x-ref="list">
+                                <template x-for="(curr, i) in filtered" :key="curr.code">
+                                    <li>
+                                        <button type="button"
+                                                @mousedown.prevent="pick(curr)"
+                                                class="w-full text-left px-3 py-1.5 text-sm transition-colors"
+                                                :class="i===activeIdx ? 'bg-indigo-50 text-indigo-700 font-medium' : (curr.code===selected.code ? 'bg-slate-50 text-slate-700 font-medium' : 'text-slate-800 hover:bg-slate-50')">
+                                            <span class="font-mono text-xs font-semibold" x-text="curr.code"></span>
+                                            <span class="ml-2 text-slate-500" x-text="curr.name"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                        <input type="hidden" name="currency" :value="selected.code">
+                    </div>
+                </div>
+
+                <div>
                     <label class="<?= t('label') ?>">ID Type</label>
                     <div class="relative" x-data="{open:false}" @keydown.escape="open=false">
                         <button type="button" @click="open=!open"
@@ -218,21 +276,21 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
 
                 <div>
                     <label class="<?= t('label') ?>">
-                        ID No <span class="text-red-400" id="idNoRequired" x-show="idType !== 'NONE'">*</span>
+                        ID No <span class="text-red-400" id="idNoRequired" x-show="idType !== 'NA'">*</span>
                     </label>
                     <input type="text" name="id_no" id="idNoInput"
                            value="<?= e($c['id_no'] ?? '') ?>"
-                           :required="idType !== 'NONE'"
+                           :required="idType !== 'NA'"
                            class="<?= t('input') ?> uppercase" style="text-transform:uppercase">
                 </div>
 
                 <div>
                     <label class="<?= t('label') ?>">
-                        TIN Number <span class="text-red-400" x-show="idType !== 'NONE'">*</span>
+                        TIN Number <span class="text-red-400" x-show="idType !== 'NA'">*</span>
                     </label>
                     <input type="text" name="tin_no" id="tinNoInput"
                            value="<?= e($c['tin_no'] ?? '') ?>"
-                           :required="idType !== 'NONE'"
+                           :required="idType !== 'NA'"
                            class="<?= t('input') ?> uppercase" style="text-transform:uppercase">
                 </div>
 
@@ -275,22 +333,22 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
                 <div>
                     <label class="<?= t('label') ?>">
                         MSIC Code
-                        <span class="text-red-400" x-show="idType !== 'NONE'">*</span>
+                        <span class="text-red-400" x-show="idType !== 'NA'">*</span>
                     </label>
                     <input type="text" name="msic_code" id="msicInput"
                            value="<?= e($c['msic_code'] ?? '') ?>"
-                           :required="idType !== 'NONE'"
+                           :required="idType !== 'NA'"
                            class="<?= t('input') ?> uppercase" style="text-transform:uppercase">
                 </div>
 
                 <div>
                     <label class="<?= t('label') ?>">
                         Business Activity
-                        <span class="text-red-400" x-show="idType !== 'NONE'">*</span>
+                        <span class="text-red-400" x-show="idType !== 'NA'">*</span>
                     </label>
                     <input type="text" name="business_activity" id="bizActInput"
                            value="<?= e($c['business_activity'] ?? '') ?>"
-                           :required="idType !== 'NONE'"
+                           :required="idType !== 'NA'"
                            class="<?= t('input') ?> uppercase" style="text-transform:uppercase">
                 </div>
 
@@ -358,7 +416,7 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
                                    @focus="onFocus()"
                                    @input="q=$event.target.value; activeIdx=-1"
                                    @blur="onBlur()"
-                                   @keydown.escape="open=false; q=''"
+                                   @keydown.escape="$el.blur()"
                                    @keydown.arrow-down.prevent="moveDown()"
                                    @keydown.arrow-up.prevent="moveUp()"
                                    @keydown.enter.prevent="pickActive()"
@@ -480,6 +538,100 @@ layoutOpen('Company Profile', 'Legal entity details and API credentials.');
 </form>
 
 <script>
+// ── Currencies list (same as invoice.php) ───────────────────────
+var COMPANY_CURRENCIES = [
+    {code:'MYR',name:'Malaysian Ringgit'},{code:'USD',name:'US Dollar'},
+    {code:'EUR',name:'Euro'},{code:'GBP',name:'British Pound'},
+    {code:'SGD',name:'Singapore Dollar'},{code:'AUD',name:'Australian Dollar'},
+    {code:'CAD',name:'Canadian Dollar'},{code:'JPY',name:'Japanese Yen'},
+    {code:'CNY',name:'Chinese Yuan'},{code:'HKD',name:'Hong Kong Dollar'},
+    {code:'CHF',name:'Swiss Franc'},{code:'NZD',name:'New Zealand Dollar'},
+    {code:'SEK',name:'Swedish Krona'},{code:'NOK',name:'Norwegian Krone'},
+    {code:'DKK',name:'Danish Krone'},{code:'KRW',name:'South Korean Won'},
+    {code:'INR',name:'Indian Rupee'},{code:'IDR',name:'Indonesian Rupiah'},
+];
+
+function companyCurrencyComp(initialCode) {
+    var sorted = COMPANY_CURRENCIES.slice().sort(function(a, b) {
+        return a.name.localeCompare(b.name);
+    });
+    // Keep MYR first
+    sorted = sorted.filter(function(c){ return c.code !== 'MYR'; });
+    sorted.unshift(COMPANY_CURRENCIES.find(function(c){ return c.code === 'MYR'; }));
+
+    var def = sorted.find(function(c){ return c.code === initialCode; }) || sorted[0];
+    return {
+        inputId: 'companyCurrencyInput',
+        q: '', open: false, activeIdx: -1,
+        selected: { code: def.code, label: def.code + ' \u2014 ' + def.name },
+        currencies: sorted,
+        get filtered() {
+            var q = this.q.trim().toLowerCase();
+            if (!q) return this.currencies;
+            return this.currencies.filter(function(c) {
+                return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
+            });
+        },
+        onFocus: function() {
+            this.q = ''; this.open = true; this.activeIdx = -1;
+            var self = this;
+            this.$nextTick(function() {
+                var el = document.getElementById('companyCurrencyInput');
+                if (el) el.select();
+            });
+        },
+        pick: function(c) {
+            this.selected  = { code: c.code, label: c.code + ' \u2014 ' + c.name };
+            this.q = ''; this.open = false; this.activeIdx = -1;
+            var inp = document.getElementById('companyCurrencyInput');
+            if (inp) inp.blur();
+        },
+        pickActive: function() {
+            var list = this.filtered;
+            var idx = this.activeIdx >= 0 ? this.activeIdx : 0;
+            if (list[idx] && (this.q.trim() !== '' || this.activeIdx >= 0)) {
+                this.pick(list[idx]);
+            } else {
+                this.revert();
+            }
+        },
+        revert: function() {
+            this.q = ''; this.open = false; this.activeIdx = -1;
+            var inp = document.getElementById(this.inputId);
+            if (inp) {
+                inp.value = this.selected.label;
+                inp.blur();
+            }
+        },
+        cancel: function() {
+            this.q = ''; this.open = false; this.activeIdx = -1;
+        },
+        moveDown: function() {
+            this.activeIdx = Math.min(this.activeIdx + 1, this.filtered.length - 1);
+            this.scrollActive();
+        },
+        moveUp: function() {
+            this.activeIdx = Math.max(this.activeIdx - 1, 0);
+            this.scrollActive();
+        },
+        scrollActive: function() {
+            var self = this;
+            this.$nextTick(function() {
+                var list = self.$refs.list;
+                if (!list) return;
+                var active = list.querySelectorAll('li')[self.activeIdx];
+                if (active) active.scrollIntoView({ block: 'nearest' });
+            });
+        },
+        onBlur: function() {
+            var self = this;
+            setTimeout(function() {
+                if (self.open) { self.cancel(); }
+            }, 200);
+        }
+    };
+}
+
 // ── Countries list (same as invoice.php currencies pattern) ──────
 var COMPANY_COUNTRIES = [
     {code:'MYS',name:'Malaysia'},{code:'SGP',name:'Singapore'},{code:'IDN',name:'Indonesia'},
@@ -509,6 +661,7 @@ function companyCountryComp(initialCode) {
 
     var def = sorted.find(function(c){ return c.code === initialCode; }) || sorted[0];
     return {
+        inputId: 'companyCountryInput',
         q: '', open: false, activeIdx: -1,
         selected: { code: def.code, label: def.code + ' — ' + def.name },
         countries: sorted,
@@ -534,9 +687,24 @@ function companyCountryComp(initialCode) {
             if (inp) inp.blur();
         },
         pickActive: function() {
-            if (this.activeIdx < 0) return;
             var list = this.filtered;
-            if (list[this.activeIdx]) this.pick(list[this.activeIdx]);
+            var idx = this.activeIdx >= 0 ? this.activeIdx : 0;
+            if (list[idx] && (this.q.trim() !== '' || this.activeIdx >= 0)) {
+                this.pick(list[idx]);
+            } else {
+                this.revert();
+            }
+        },
+        revert: function() {
+            this.q = ''; this.open = false; this.activeIdx = -1;
+            var inp = document.getElementById(this.inputId);
+            if (inp) {
+                inp.value = this.selected.label;
+                inp.blur();
+            }
+        },
+        cancel: function() {
+            this.q = ''; this.open = false; this.activeIdx = -1;
         },
         moveDown: function() {
             this.activeIdx = Math.min(this.activeIdx + 1, this.filtered.length - 1);
@@ -558,7 +726,7 @@ function companyCountryComp(initialCode) {
         onBlur: function() {
             var self = this;
             setTimeout(function() {
-                if (self.open) { self.open = false; self.q = ''; self.activeIdx = -1; }
+                if (self.open) { self.cancel(); }
             }, 200);
         }
     };
@@ -567,9 +735,9 @@ function companyCountryComp(initialCode) {
 // ── Main form Alpine component ───────────────────────────────────
 function companyFormComp() {
     return {
-        idType: '<?= e($c['id_type'] ?? 'NONE') ?>',
+        idType: '<?= e($c['id_type'] ?? 'NA') ?>',
         idTypeOptions: [
-            {v:'NONE',    l:'None'},
+            {v:'NA',    l:'None'},
             {v:'NRIC',    l:'NRIC'},
             {v:'BRN',     l:'BRN'},
             {v:'ARMY',    l:'Army No'},
@@ -604,7 +772,7 @@ function companyFormComp() {
             check('company_name', 'Company Name');
 
             // Required only when ID Type != None
-            if (idType !== 'NONE' && idType !== '') {
+            if (idType !== 'NA' && idType !== '') {
                 check('idNoInput',   'ID No');
                 check('tinNoInput',  'TIN Number');
                 check('msicInput',   'MSIC Code');
@@ -644,30 +812,42 @@ function showLogoPreview(input) {
         if (e.target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         var focusable = Array.from(form.querySelectorAll(
-            'input:not([type=hidden]):not([disabled]), button[type=submit]'
-        )).filter(function(el) { return el.offsetParent !== null; });
+            'input:not([type=hidden]):not([disabled]), button:not([disabled])'
+        )).filter(function(el) { 
+            return el.offsetParent !== null && !el.closest('ul'); 
+        });
         var idx = focusable.indexOf(e.target);
         if (idx > -1 && idx < focusable.length - 1) {
             var next = focusable[idx + 1];
             next.focus();
             if (next.tagName === 'INPUT') next.select();
-        } else {
+        } else if (idx === focusable.length - 1 || e.target.type === 'submit') {
             form.querySelector('button[type=submit]').click();
         }
     });
 })();
 
-// ── Country panel scroll tracking ───────────────────────────────
+// ── Panel scroll tracking ───────────────────────────────────────
 (function() {
     var mainEl = document.querySelector('main');
     if (!mainEl) return;
     mainEl.addEventListener('scroll', function() {
-        var inp = document.getElementById('companyCountryInput');
-        var panel = document.getElementById('companyCountryPanel');
-        if (!inp || !panel || panel.style.display === 'none') return;
-        var r = inp.getBoundingClientRect();
-        panel.style.top  = (r.bottom + 4) + 'px';
-        panel.style.left = r.left + 'px';
+        // Country
+        var inpC = document.getElementById('companyCountryInput');
+        var panC = document.getElementById('companyCountryPanel');
+        if (inpC && panC && panC.style.display !== 'none') {
+            var r = inpC.getBoundingClientRect();
+            panC.style.top = (r.bottom + 4) + 'px';
+            panC.style.left = r.left + 'px';
+        }
+        // Currency
+        var inpR = document.getElementById('companyCurrencyInput');
+        var panR = document.getElementById('companyCurrencyPanel');
+        if (inpR && panR && panR.style.display !== 'none') {
+            var r = inpR.getBoundingClientRect();
+            panR.style.top = (r.bottom + 4) + 'px';
+            panR.style.left = r.left + 'px';
+        }
     }, { passive: true });
 })();
 </script>
