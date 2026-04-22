@@ -7,9 +7,9 @@ include 'includes/dropdown.php';
 
 $pdo    = db();
 $action = $_GET['action'] ?? 'list';  // list | new | edit
-$invoiceCustomFields = []; // default — populated in form branch
+$invoiceCustomFields = []; // default - populated in form branch
 
-// ── Helper: compute next number for a format (defined here so available in all branches) ──
+// -- Helper: compute next number for a format (defined here so available in all branches) --
 function computeNextNo(PDO $pdo, string $format): string {
     $now    = new DateTime();
     $year   = (int)$now->format('Y');
@@ -34,12 +34,12 @@ function computeNextNo(PDO $pdo, string $format): string {
     return $out;
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ================
 // VIEW: LIST
-// ══════════════════════════════════════════════════════════════════
+// ================
 if ($action === 'list'):
 
-// ── Stats ──────────────────────────────────────
+// -- Stats ----------------
 $stats = $pdo->query("
     SELECT
         COUNT(*)                                                           AS total,
@@ -51,7 +51,7 @@ $stats = $pdo->query("
     FROM invoices
 ")->fetch();
 
-// ── Filters ────────────────────────────────────
+// -- Filters ----------------
 $search   = trim($_GET['search']    ?? '');
 $statusF  = trim($_GET['status']    ?? '');
 $lhdnF    = trim($_GET['lhdn']      ?? '');
@@ -174,7 +174,7 @@ document.querySelector('main').style.display       = 'flex';
 document.querySelector('main').style.flexDirection = 'column';
 </script>
 
-<!-- ── Stat cards ──────────────────────────────── -->
+<!-- -- Stat cards ---------------- -->
 <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
     <?php
     $cards = [
@@ -197,7 +197,7 @@ document.querySelector('main').style.flexDirection = 'column';
     <?php endforeach; ?>
 </div>
 
-<!-- ── Filter bar ─────────────────────────────── -->
+<!-- -- Filter bar ---------------- -->
 <form id="filterForm" method="GET" class="<?= t('card') ?> flex flex-wrap items-end gap-3 mb-5"
       onkeydown="if(event.key==='Enter'&&event.target.id!=='filterSearch'){event.preventDefault();}">
     <input type="hidden" name="action" value="list">
@@ -207,7 +207,7 @@ document.querySelector('main').style.flexDirection = 'column';
         <div class="relative">
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <input type="text" name="search" id="filterSearch" value="<?= e($search) ?>"
-                   placeholder="Invoice # or customer…"
+                   placeholder="Invoice # or customer..."
                    onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('filterForm').submit();}"
                    class="<?= t('input') ?> pl-8">
         </div>
@@ -265,7 +265,7 @@ document.querySelector('main').style.flexDirection = 'column';
     </div>
 </form>
 
-<!-- ── Table ─────────────────────────────────── -->
+<!-- -- Table ---------------- -->
 <div id="invWrap" class="flex flex-col flex-1 min-h-0">
     <div class="bg-white rounded-xl border border-slate-200 flex-1 min-h-0 flex flex-row overflow-hidden">
 
@@ -609,7 +609,7 @@ function invSetHeight() {
     if (as) as.style.height = h;
 }
 
-// ── Delete ──────────────────────────────────────
+// -- Delete ----------------
 var _deleteId = null;
 function confirmDelete(id, no) {
     _deleteId = id;
@@ -637,7 +637,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function()
     }).catch(() => { closeDelete(); btn.disabled = false; btn.textContent = 'Delete'; showToast('Server error.', 'error'); });
 });
 
-// ── Column visibility ────────────────────────────
+// -- Column visibility ----------------
 var COL_KEY      = 'invoice_col_prefs_v2';
 var COL_DEFAULTS = {customer:true, invoice_date:true, due_date:true, amount:true, status:true, lhdn:true};
 
@@ -725,7 +725,7 @@ function closeColPanel() {
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeColPanel(); });
 
-// ── Date picker ────────────────────────────────
+// -- Date picker ----------------
 (function() {
     var MONTHS_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -794,7 +794,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     makePicker('filterDateTo','filterDateToIso',autoSubmitIfValid);
 })();
 
-// ── Init ──────────────────────────────────────
+// -- Init ----------------
 document.addEventListener('DOMContentLoaded', function() {
     bindViewAll();
     applyColPrefs(loadColPrefs());
@@ -808,12 +808,12 @@ window.addEventListener('resize', function() { invSetHeight(); setTimeout(invSyn
 
 <?php layoutClose();
 
-// ══════════════════════════════════════════════════════════════════
+// ================
 // VIEW: NEW / EDIT
-// ══════════════════════════════════════════════════════════════════
+// ================
 else: // action === 'new' or 'edit'
 
-// ── Edit mode ──────────────────────────────────
+// -- Edit mode ----------------
 $editMode = false;
 $inv      = null;
 $items    = [];
@@ -831,12 +831,12 @@ if ($action === 'edit' && !empty($_GET['id'])) {
     }
 }
 
-// ── Tax rates from DB ─────────────────────────
+// -- Tax rates from DB ----------------
 try {
     $taxRates = $pdo->query("SELECT id, name, rate FROM tax_rates ORDER BY is_default DESC, name")->fetchAll();
 } catch (Exception $e) { $taxRates = []; }
 
-// ── Invoice number formats ────────────────────
+// -- Invoice number formats ----------------
 $invoiceFormats = $pdo->query("SELECT * FROM number_formats WHERE doc_type='invoice' ORDER BY is_default DESC, id")->fetchAll();
 $nextNo = '';
 $defaultFormatId = 0;
@@ -845,7 +845,7 @@ if (!$editMode && !empty($invoiceFormats)) {
     $nextNo = computeNextNo($pdo, $invoiceFormats[0]['format']);
 }
 
-// ── Customers with contact persons & addresses ─────────────────────
+// -- Customers with contact persons & addresses ----------------
 // Try fetching customers with payment_term_id (requires setup.php migration)
 try {
     $customers = $pdo->query("SELECT c.id,c.customer_name,c.tin,c.reg_no,c.email,c.phone,c.address_line_0,c.address_line_1,c.city,c.postal_code,c.state_code,c.country_code,c.currency,c.default_payment_mode,c.payment_term_id,COALESCE(pt.name,'') AS payment_term_name FROM customers c LEFT JOIN payment_terms pt ON pt.id=c.payment_term_id ORDER BY c.customer_name")->fetchAll();
@@ -864,10 +864,10 @@ try {
 $invPtByCash   = array_values(array_filter($allInvPaymentTerms, function($r){ return $r['payment_mode']==='cash'; }));
 $invPtByCredit = array_values(array_filter($allInvPaymentTerms, function($r){ return $r['payment_mode']==='credit'; }));
 
-// ── Products for item dropdown ──────────────────────────────────────
+// -- Products for item dropdown ----------------
 try {
     $products_for_invoice = $pdo->query("
-        SELECT p.id, p.name, p.sku, p.sale_price, p.sale_description, p.classification_code,
+        SELECT p.id, p.name, p.sku, p.sale_price, p.sale_description,
                p.track_inventory, COALESCE(s.qty_on_hand, 0) AS qty_on_hand,
                COALESCE(p.image_path, '')       AS image_path,
                COALESCE(p.base_unit_label, 'unit') AS base_unit_label
@@ -965,7 +965,7 @@ foreach ($customers as &$_c) {
 }
 unset($_c);
 
-// ── Existing attachments ───────────────────────
+// -- Existing attachments ----------------
 $existingAttachments = [];
 if ($editMode) {
     try {
@@ -977,7 +977,7 @@ if ($editMode) {
 
 $initItems = $editMode && !empty($items) ? $items : [];
 
-// ── Fetch custom fields for Invoice ──────────────────────────────
+// -- Fetch custom fields for Invoice ----------------
 $invoiceCustomFields = [];
 try {
     $cfStmt = db()->prepare("
@@ -1004,7 +1004,7 @@ $pageTitle = $editMode ? 'Edit Invoice' : 'New Invoice';
 $pageSub   = $editMode ? e($inv['invoice_no']) : 'Fill in the details below';
 layoutOpen($pageTitle, $pageSub);
 ?>
-<!-- ── Out of Stock Warning modal ──────────────── -->
+<!-- -- Out of Stock Warning modal ---------------- -->
 <div id="stockWarningModal" class="fixed inset-0 flex items-center justify-center" style="z-index:10001;display:none">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col">
@@ -1122,13 +1122,51 @@ layoutOpen($pageTitle, $pageSub);
     </div>
 </div>
 
+<div id="quotationTransferModal" class="fixed inset-0 items-center justify-center px-4 py-6" style="z-index:10000;display:none">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeQuotationTransferModal(true)"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-auto flex flex-col border border-slate-200 overflow-hidden" style="height:min(88vh,720px)">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+            <div>
+                <h3 class="text-base font-semibold text-slate-800">Transfer Items from Quotations</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Choose the quotation item lines and quantities to add to this invoice.</p>
+            </div>
+            <button type="button" onclick="closeQuotationTransferModal(true)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors text-xl">&times;</button>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-auto px-6 py-5">
+            <div id="quotationTransferBody" class="space-y-5"></div>
+            <div id="quotationTransferEmpty" class="hidden h-full min-h-[260px] items-center justify-center text-center">
+                <div>
+                    <div class="mx-auto w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6M12 9v6"/><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                    </div>
+                    <div class="text-sm font-medium text-slate-700">No quotations selected yet.</div>
+                    <div class="text-xs text-slate-400 mt-1">Add a quotation to choose which item lines to transfer.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+            <button type="button" onclick="addMoreQuotationToTransfer()" class="<?= t('btn_base') ?> bg-blue-600 text-white hover:bg-blue-700 h-9">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                Quotation
+            </button>
+            <div class="flex items-center gap-3">
+                <p id="quotationTransferHint" class="text-sm text-slate-400">Select item lines to transfer.</p>
+                <button type="button" id="quotationTransferConfirmBtn" onclick="confirmQuotationTransfer()" class="<?= t('btn_base') ?> <?= t('btn_primary') ?> h-9" disabled>Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
-/* ── Hide number input spinners in items table ── */
+/* -- Hide number input spinners in items table -- */
 .no-spin::-webkit-outer-spin-button,
 .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .no-spin { -moz-appearance: textfield; }
 
-/* ── Date picker ── */
+/* -- Date picker -- */
 .dp-popup{position:fixed;z-index:9999;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.12);padding:16px;width:284px;font-family:'Inter',sans-serif;display:none}
 .dp-popup.is-open{display:block}
 .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -1174,20 +1212,20 @@ document.getElementById('pageActions').innerHTML = `
 </script>
 
 <script>
-// Tax data — defined early so Alpine x-data on item rows can reference these
+// Tax data - defined early so Alpine x-data on item rows can reference these
 const TAX_RATES = <?php
     $tr = [''=>0];
     foreach ($taxRates as $t) $tr[(string)$t['id']] = (float)$t['rate'] / 100;
     echo json_encode($tr);
 ?>;
 const TAX_OPTIONS = <?php
-    $opts = [['value'=>'','text'=>'—']];
+    $opts = [['value'=>'','text'=>'-']];
     foreach ($taxRates as $t) $opts[] = ['value'=>(string)$t['id'], 'text'=>htmlspecialchars($t['name']).' ('.number_format((float)$t['rate'],2).'%)'];
     echo json_encode($opts);
 ?>;
 const QUOTATION_IMPORTS = <?= $quotationImportsJson ?: '[]' ?>;
 
-// Payment methods — defined early so Alpine x-data on payment rows can reference these
+// Payment methods - defined early so Alpine x-data on payment rows can reference these
 // Returns payment terms from DB filtered by current payment mode
 // Each term: {v: id, l: name}
 function getPaymentTerms() {
@@ -1195,7 +1233,7 @@ function getPaymentTerms() {
     return list.map(function(pt) { return {v: String(pt.id), l: pt.name}; });
 }
 
-// Payment terms grouped by mode — for the Payment Term dropdown
+// Payment terms grouped by mode - for the Payment Term dropdown
 const INVOICE_PT = {
     cash:   <?= json_encode($invPtByCash,   JSON_HEX_TAG|JSON_HEX_QUOT) ?>,
     credit: <?= json_encode($invPtByCredit, JSON_HEX_TAG|JSON_HEX_QUOT) ?>
@@ -1223,7 +1261,7 @@ var _customerPaymentTermName = '';
 
 <div class="bg-white rounded-xl border border-slate-200 mb-24">
 
-<!-- ═══ SECTION 1: Billing & Shipping ═══ -->
+<!-- === SECTION 1: Billing & Shipping === -->
 <div class="grid grid-cols-[200px_1fr]" x-data="customerSearch()">
     <div class="p-6 border-r border-slate-100">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">Billing &amp; Shipping</h3>
@@ -1231,7 +1269,7 @@ var _customerPaymentTermName = '';
     </div>
     <div class="p-6" x-init="selected = <?= $editMode ? 'true' : 'false' ?>; ship = <?= ($editMode && !empty($inv['shipping_address'])) ? 'true' : 'false' ?>">
 
-        <!-- Customer row — label left, toggle right, same line -->
+        <!-- Customer row - label left, toggle right, same line -->
         <div class="grid grid-cols-2 gap-4 mb-4">
             <!-- Customer search (left col) -->
             <div>
@@ -1252,7 +1290,7 @@ var _customerPaymentTermName = '';
                                :class="selected ? 'pr-16 font-medium text-slate-800' : 'pr-4'"
                                style="outline:none">
 
-                        <!-- Edit + Clear icons — only when selected -->
+                        <!-- Edit + Clear icons - only when selected -->
                         <div x-show="selected" class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                             <button type="button"
                                     onmousedown="event.preventDefault(); openQuickEdit();"
@@ -1358,7 +1396,7 @@ var _customerPaymentTermName = '';
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 2: General Info ═══ -->
+<!-- === SECTION 2: General Info === -->
 <div class="grid grid-cols-[200px_1fr]">
     <div class="p-6 border-r border-slate-100">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">General Info</h3>
@@ -1377,7 +1415,7 @@ var _customerPaymentTermName = '';
                     <input type="hidden" name="invoice_no" value="<?= e($inv['invoice_no']) ?>">
                 <?php elseif (empty($invoiceFormats)): ?>
                     <div class="<?= t('input') ?> text-slate-400 flex items-center">No invoice formats configured</div>
-                    <p class="text-xs text-amber-600 mt-1">Add one in Control Panel → Number Formats.</p>
+                    <p class="text-xs text-amber-600 mt-1">Add one in Control Panel -> Number Formats.</p>
                 <?php else: ?>
                     <div id="invoiceNoDd" class="relative">
                         <!-- Trigger -->
@@ -1512,7 +1550,7 @@ var _customerPaymentTermName = '';
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 3: Items ═══ -->
+<!-- === SECTION 3: Items === -->
 <div>
     <div class="flex items-center justify-between px-6 py-4">
         <h3 class="text-sm font-semibold text-slate-800">Items</h3>
@@ -1555,9 +1593,8 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
     $discVal  = (float)($item['discount_pct'] ?? 0);
     $discMode = !empty($item['discount_mode']) ? $item['discount_mode'] : 'pct';
     $descNote = $item['item_description'] ?? '';
-    $classVal = $item['classification'] ?? '';
     $txVal   = $item['tax_type'] ?? '';
-    $txLabel = '—';
+    $txLabel = '-';
     foreach ($taxRates as $_tr) {
         if ((string)$_tr['id'] === (string)$txVal) {
             $txLabel = e($_tr['name']).' ('.number_format((float)$_tr['rate'],2).'%)';
@@ -1616,7 +1653,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                     <td class="px-2 py-2.5 text-right text-sm font-semibold text-slate-700">
                         <span class="subtotal-qty">0</span>
                     </td>
-                    <td class="px-2 py-2.5"></td><!-- unit price — blank -->
+                    <td class="px-2 py-2.5"></td><!-- unit price - blank -->
                     <td class="px-2 py-2.5 text-right text-sm font-semibold text-slate-800">
                         <span class="subtotal-display"><?= number_format((float)($item['line_total'] ?? 0), 2, '.', '') ?></span>
                     </td>
@@ -1638,7 +1675,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                     <td class="px-3 pt-2 pb-0 text-sm text-slate-700 text-center font-medium row-num" rowspan="2"
                         style="vertical-align:top;padding-top:12px"><?= $i+1 ?></td>
 
-                    <!-- Item name — product search combobox -->
+                    <!-- Item name - product search combobox -->
                     <td class="px-3 pt-2 pb-0">
                         <div class="relative">
                             <input type="hidden" name="items[<?= $i ?>][product_id]" class="item-product-id" value="<?= e($item['product_id'] ?? '') ?>">
@@ -1691,14 +1728,14 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                         <input type="hidden" name="items[<?= $i ?>][discount_mode]" class="item-disc-mode" value="<?= e($discMode) ?>">
                     </td>
 
-                    <!-- Tax dropdown — dropdown.php pattern -->
+                    <!-- Tax dropdown - dropdown.php pattern -->
                     <td class="px-2 pt-2 pb-0"
                         x-data="{open:false,value:'<?= e($txVal) ?>',options:TAX_OPTIONS}">
                         <div class="relative">
                             <button type="button"
                                     @click="open=!open" @keydown.escape="open=false"
                                     class="w-full h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-left flex items-center justify-between gap-1 text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-300">
-                                <span x-text="options.find(o=>o.value===value)?.text||'—'" class="text-slate-800 truncate"></span>
+                                <span x-text="options.find(o=>o.value===value)?.text||'-'" class="text-slate-800 truncate"></span>
                                 <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="open?'rotate-180':''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                             </button>
                             <div x-show="open" @click.outside="open=false" style="display:none"
@@ -1722,7 +1759,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                             </div>
                             <select name="items[<?= $i ?>][tax_type]"
                                     class="absolute opacity-0 pointer-events-none w-0 h-0 top-0 left-0 item-tax" tabindex="-1" aria-hidden="true">
-                                <option value="">—</option>
+                                <option value="">-</option>
                                 <?php foreach ($taxRates as $_tr): ?>
                                 <option value="<?= $_tr['id'] ?>" <?= (string)$_tr['id'] === (string)$txVal ? 'selected' : '' ?>><?= e($_tr['name']) ?></option>
                                 <?php endforeach; ?>
@@ -1730,7 +1767,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                         </div>
                     </td>
 
-                    <!-- Delete — rowspan covers both rows -->
+                    <!-- Delete - rowspan covers both rows -->
                     <td class="px-2 py-2 text-center" rowspan="2" style="vertical-align:middle">
                         <button type="button" onclick="removeRow(this)"
                                 class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors mx-auto">
@@ -1739,52 +1776,13 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                     </td>
                 </tr>
 
-                <!-- ROW 2: description note + LHDN classification on same row -->
+                <!-- ROW 2: description note -->
                 <tr class="item-desc-row border-b border-slate-50 transition-colors">
                     <!-- # col handled by rowspan -->
-                    <td class="px-3 pb-2 pt-1">
+                    <td class="px-3 pb-2 pt-1" colspan="6">
                         <input type="text" name="items[<?= $i ?>][item_description]" value="<?= e($descNote) ?>"
                                placeholder="Description (optional)"
                                class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-slate-600 focus:outline-none focus:border-indigo-500 transition placeholder-slate-300">
-                    </td>
-                    <!-- LHDN Classification spans the remaining 5 numeric cols -->
-                    <td class="px-2 pb-2 pt-1" colspan="5">
-                        <input type="hidden" name="items[<?= $i ?>][classification]" class="item-class" value="<?= e($classVal) ?>">
-                        <div class="relative" x-data="lhdnComp('<?= e($classVal) ?>')">
-                            <input type="text" x-ref="inp"
-                                   :value="open ? q : displayLabel"
-                                   @focus="onFocus()"
-                                   @input="q=$event.target.value"
-                                   @blur="onBlur()"
-                                   @keydown.escape="open=false;q=''"
-                                   @keydown.arrow-down.prevent="moveDown()"
-                                   @keydown.arrow-up.prevent="moveUp()"
-                                   @keydown.enter.prevent="pickActive()"
-                                   placeholder="LHDN Classification..."
-                                   autocomplete="off"
-                                   data-no-search-convert
-                                   class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm focus:outline-none focus:border-indigo-500 transition pr-7">
-                            <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
-                                 :class="open?'rotate-180':''"
-                                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="M19 9l-7 7-7-7"/>
-                            </svg>
-                            <div x-show="open" @mousedown.prevent style="display:none"
-                                 class="fixed z-[9996] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden" data-dd-panel
-                                 x-init="$watch('open',function(v){if(v){ddPos($el.parentElement,$el);}})">
-                                <ul class="max-h-56 overflow-y-auto py-1" x-ref="list">
-                                    <template x-for="(o,i) in filteredCodes" :key="o.v">
-                                        <li>
-                                            <button type="button" @mousedown.prevent="pickItem(o)"
-                                                    class="w-full text-left px-3 py-1.5 text-sm transition-colors"
-                                                    :class="i===activeIdx?'bg-indigo-50 text-indigo-700 font-medium':(value===o.v?'bg-slate-50 text-slate-700 font-medium':'text-slate-700 hover:bg-slate-50')">
-                                                <span x-text="o.l"></span>
-                                            </button>
-                                        </li>
-                                    </template>
-                                </ul>
-                            </div>
-                        </div>
                     </td>
                     <!-- delete col handled by rowspan -->
                 </tr>
@@ -1874,7 +1872,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 4: Additional Info ═══ -->
+<!-- === SECTION 4: Additional Info === -->
 <div class="grid grid-cols-[200px_1fr]">
     <div class="p-6 border-r border-slate-100">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">Additional Info</h3>
@@ -1889,7 +1887,7 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 4b: Payment Received ═══ -->
+<!-- === SECTION 4b: Payment Received === -->
 <?php
 // Load existing payments (edit mode)
 $existingPayments = [];
@@ -2010,7 +2008,7 @@ $paymentMethodLabels = [
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 5: Attachments ═══ -->
+<!-- === SECTION 5: Attachments === -->
 <div class="grid grid-cols-[200px_1fr]">
     <div class="p-6 border-r border-slate-100">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">Attachments</h3>
@@ -2069,7 +2067,7 @@ $paymentMethodLabels = [
 
 <div class="border-t border-slate-100"></div>
 
-<!-- ═══ SECTION 6: Custom Fields ═══ -->
+<!-- === SECTION 6: Custom Fields === -->
 <?php if (!empty($invoiceCustomFields)): ?>
 <div class="grid grid-cols-[200px_1fr]">
     <div class="p-6 border-r border-slate-100">
@@ -2113,7 +2111,7 @@ $paymentMethodLabels = [
                     'custom_field[' . $cfId . ']',
                     $cfOptPairs,
                     $cfVal,
-                    '— Select or type —',
+                    '- Select or type -',
                     (bool)$cff['is_required'],
                     'w-full'
                 ); ?>
@@ -2132,7 +2130,7 @@ $paymentMethodLabels = [
 </div>
 <div class="border-t border-slate-100"></div>
 <?php endif; ?>
-<!-- ═══ SECTION 6: Controls ═══ -->
+<!-- === SECTION 6: Controls === -->
 <div class="grid grid-cols-[200px_1fr]">
     <div class="p-6 border-r border-slate-100">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">Controls</h3>
@@ -2227,61 +2225,11 @@ window._qaLastCustomer = <?php if ($_custRow): ?>{
     default_shipping_address: <?= $_defShippingAddr ? json_encode($_defShippingAddr, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT) : 'null' ?>,
 }<?php else: ?>null<?php endif; ?>;
 <?php endif; ?>
-// ── LHDN Classification codes ────────────────────────────────────
-var LHDN_CODES = [
-    {v:'',    l:'— No classification —'},
-    {v:'001', l:'001 - Breastfeeding equipment'},
-    {v:'002', l:'002 - Child care centres and kindergartens fees'},
-    {v:'003', l:'003 - Computer, smartphone or tablet'},
-    {v:'004', l:'004 - Consolidated e-Invoice'},
-    {v:'005', l:'005 - Construction materials'},
-    {v:'006', l:'006 - Disbursement'},
-    {v:'007', l:'007 - Donation'},
-    {v:'008', l:'008 - e-Commerce - e-Invoice to buyer/purchaser'},
-    {v:'009', l:'009 - e-Commerce - Self-billed e-Invoice'},
-    {v:'010', l:'010 - Education fees'},
-    {v:'011', l:'011 - Goods on consignment (Consignor)'},
-    {v:'012', l:'012 - Goods on consignment (Consignee)'},
-    {v:'013', l:'013 - Gym membership'},
-    {v:'014', l:'014 - Insurance - Education and medical benefits'},
-    {v:'015', l:'015 - Insurance - Takaful or life insurance'},
-    {v:'016', l:'016 - Interest and financing expenses'},
-    {v:'017', l:'017 - Internet subscription'},
-    {v:'018', l:'018 - Land and building'},
-    {v:'019', l:'019 - Medical examination for learning disabilities'},
-    {v:'020', l:'020 - Medical examination or vaccination expenses'},
-    {v:'021', l:'021 - Medical expenses for serious diseases'},
-    {v:'022', l:'022 - Others'},
-    {v:'023', l:'023 - Petroleum operations'},
-    {v:'024', l:'024 - Private retirement scheme'},
-    {v:'025', l:'025 - Motor vehicle'},
-    {v:'026', l:'026 - Subscription of books/journals/magazines'},
-    {v:'027', l:'027 - Reimbursement'},
-    {v:'028', l:'028 - Rental of motor vehicle'},
-    {v:'029', l:'029 - EV charging facilities'},
-    {v:'030', l:'030 - Repair and maintenance'},
-    {v:'031', l:'031 - Research and development'},
-    {v:'032', l:'032 - Foreign income'},
-    {v:'033', l:'033 - Self-billed - Betting and gaming'},
-    {v:'034', l:'034 - Self-billed - Importation of goods'},
-    {v:'035', l:'035 - Self-billed - Importation of services'},
-    {v:'036', l:'036 - Self-billed - Others'},
-    {v:'037', l:'037 - Self-billed - Monetary payment to agents'},
-    {v:'038', l:'038 - Sports equipment and facilities'},
-    {v:'039', l:'039 - Supporting equipment for disabled person'},
-    {v:'040', l:'040 - Voluntary contribution to approved provident fund'},
-    {v:'041', l:'041 - Dental examination or treatment'},
-    {v:'042', l:'042 - Fertility treatment'},
-    {v:'043', l:'043 - Treatment and home care nursing'},
-    {v:'044', l:'044 - Vouchers, gift cards, loyalty points'},
-    {v:'045', l:'045 - Self-billed - Non-monetary payment to agents'}
-];
-
 let taxMode    = document.getElementById('taxMode').value || 'exclusive';
 let rowIndex   = <?= count($initItems) ?>;
 let roundingOn = false;
 
-// ── Dropdown position helper (fixes panels to trigger on scroll/resize) ──
+// -- Dropdown position helper (fixes panels to trigger on scroll/resize) --
 function ddPos(trigger, panel) {
     var r          = trigger.getBoundingClientRect();
     var panelH     = panel.offsetHeight || 220; // estimated height if not yet visible
@@ -2311,7 +2259,7 @@ function ddPos(trigger, panel) {
     window.addEventListener('resize', reposAll);
 })();
 
-// ── Date picker (3-level drill-down: Day → Month → Year decade) ──
+// -- Date picker (3-level drill-down: Day -> Month -> Year decade) --
 (function() {
     const MONTHS_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2345,13 +2293,13 @@ function ddPos(trigger, panel) {
         popup.style.left = r.left + 'px';
     }
 
-    // ── Chevron SVG helpers ──
+    // -- Chevron SVG helpers --
     var chevL = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>';
     var chevR = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
     var dblL  = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>';
     var dblR  = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>';
 
-    // ── Render day grid ──
+    // -- Render day grid --
     function renderDay() {
         var today = new Date();
         var y = viewing.getFullYear(), mo = viewing.getMonth();
@@ -2385,7 +2333,7 @@ function ddPos(trigger, panel) {
             '<div class="dp-footer"><button type="button" class="dp-today-btn" onclick="window.__dpToday()">Today</button></div>';
     }
 
-    // ── Render month grid ──
+    // -- Render month grid --
     function renderMonth() {
         var y  = viewing.getFullYear();
         var cm = viewing.getMonth();
@@ -2408,7 +2356,7 @@ function ddPos(trigger, panel) {
             '<div class="dp-footer"><button type="button" class="dp-today-btn" onclick="window.__dpToday()">Today</button></div>';
     }
 
-    // ── Render year decade grid ──
+    // -- Render year decade grid --
     function renderYear() {
         var y = viewing.getFullYear();
         // Align decade: e.g. 2000-2009
@@ -2416,7 +2364,7 @@ function ddPos(trigger, panel) {
         var todayY = (new Date()).getFullYear();
 
         var cells = '';
-        // Show decade range: decadeStart-1 (greyed) … decadeStart+10 (greyed)
+        // Show decade range: decadeStart-1 (greyed) ... decadeStart+10 (greyed)
         for (var yr = decadeStart - 1; yr <= decadeStart + 10; yr++) {
             var isOut = (yr < decadeStart || yr > decadeStart + 9);
             var isSel = (yr === y);
@@ -2443,7 +2391,7 @@ function ddPos(trigger, panel) {
         else renderYear();
     }
 
-    // ── Public handlers ──
+    // -- Public handlers --
     window.__dpSetView = function(v) { view = v; if (v==='year') decadeStart = Math.floor(viewing.getFullYear()/10)*10; render(); };
     window.__dpNav = function(dir) { viewing.setMonth(viewing.getMonth()+dir); render(); };
     window.__dpYearStep = function(dir) { viewing.setFullYear(viewing.getFullYear()+dir); render(); };
@@ -2497,13 +2445,9 @@ function ddPos(trigger, panel) {
     if (mainEl) mainEl.addEventListener('scroll', function() { if (popup.classList.contains('is-open')) pos(); }, {passive:true});
 })();
 
-// ── LHDN description lookup ──────────────────────────────────────
-var LHDN_DESC = {};
-(function(){ var codes = typeof LHDN_CODES !== 'undefined' ? LHDN_CODES : [];
-  codes.forEach(function(o){ if(o.v) LHDN_DESC[o.v] = o.l.replace(/^\d{3} - /,''); }); })();
-
-// ── Discount formatter (called onblur) ────────────────────────────
-// "20.00%" → pct mode, "20.00" → fixed mode. Always 2dp.
+// -- LHDN description lookup ----------------
+// -- Discount formatter (called onblur) ----------------
+// "20.00%" -> pct mode, "20.00" -> fixed mode. Always 2dp.
 function formatDisc(input) {
     var raw   = input.value.trim();
     var isPct = raw.endsWith('%');
@@ -2517,7 +2461,7 @@ function formatDisc(input) {
     if (mEl) mEl.value = isPct ? 'pct' : 'fixed';
 }
 
-// ── Tax mode ──────────────────────────────────────────────────────
+// -- Tax mode ----------------
 function setTaxMode(mode) {
     taxMode = mode;
     document.getElementById('taxMode').value = mode;
@@ -2527,7 +2471,7 @@ function setTaxMode(mode) {
     document.querySelectorAll('.item-row').forEach(function(row) { calcRow(row); });
 }
 
-// ── Rounding ──────────────────────────────────────────────────────
+// -- Rounding ----------------
 function toggleRounding() {
     roundingOn = !roundingOn;
     document.getElementById('roundTrack').className = 'relative w-8 h-4 rounded-full transition-colors focus:outline-none shrink-0 ' + (roundingOn ? 'bg-indigo-500' : 'bg-slate-200');
@@ -2535,7 +2479,7 @@ function toggleRounding() {
     updateTotals();
 }
 
-// ── Row calculation ──────────────────────────────────────────────
+// -- Row calculation ----------------
 // Tax Exclusive: Amount = qty*price - discount (pre-tax). Tax is added on top in totals.
 // Tax Inclusive: Amount = back-calculated pre-tax amount (gross / (1+rate)).
 function calcRow(row) {
@@ -2551,17 +2495,17 @@ function calcRow(row) {
     var base    = gross - discAmt; // after discount
     var shown;
     if (taxMode === 'inclusive') {
-        // Unit price includes tax — show back-calculated pre-tax amount
+        // Unit price includes tax - show back-calculated pre-tax amount
         shown = trate > 0 ? base / (1 + trate) : base;
     } else {
-        // Exclusive — Amount column shows pre-tax (after discount), tax added separately in totals
+        // Exclusive - Amount column shows pre-tax (after discount), tax added separately in totals
         shown = base;
     }
     row.querySelector('.item-total').value = shown.toFixed(2);
     updateTotals();
 }
 
-// ── Totals ────────────────────────────────────────────────────────
+// -- Totals ----------------
 var _pmtSyncEnabled = false; // enabled after first updateTotals (skip initial edit-mode load)
 function updateTotals() {
     var subtotal = 0, totalTax = 0, totalDisc = 0;
@@ -2621,7 +2565,7 @@ function updateTotals() {
     var rounding = 0;
     if (roundingOn) {
         // Malaysian rounding to nearest 5 sen
-        // cent digit: 0,5→keep; 1,2→down to 0; 3,4→up to 5; 6,7→down to 5; 8,9→up to 10
+        // cent digit: 0,5->keep; 1,2->down to 0; 3,4->up to 5; 6,7->down to 5; 8,9->up to 10
         var cents     = Math.round(total * 100); // work in integer cents
         var lastCent  = cents % 10;
         var roundedC;
@@ -2656,7 +2600,7 @@ function updateTotals() {
             });
         }
         txBreak.innerHTML = txHtml;
-        // Gap between multiple tax type rows — space-y-2.5 on parent handles outer gap
+        // Gap between multiple tax type rows - space-y-2.5 on parent handles outer gap
         txBreak.style.display = 'flex';
         txBreak.style.flexDirection = 'column';
         txBreak.style.gap = '0.625rem';
@@ -2677,7 +2621,7 @@ function updateTotals() {
     _pmtSyncEnabled = true;
 }
 
-// ── Row management ────────────────────────────────────────────────
+// -- Row management ----------------
 function renumberRows() {
     var n = 1;
     document.querySelectorAll('#itemsBody tr.item-row').forEach(function(r) {
@@ -2855,7 +2799,7 @@ function addRow(type) {
         '<td class="px-2 pt-2 pb-0" x-data="{open:false,value:\'\',options:TAX_OPTIONS}">'+
             '<div class=\"relative\">'+
                 '<button type=\"button\" @click=\"open=!open\" @keydown.escape=\"open=false\" class=\"w-full h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-left flex items-center justify-between gap-1 text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-300\">'+
-                    '<span x-text=\"options.find(o=>o.value===value)?.text||\'—\'\" class=\"text-slate-800 truncate\"></span>'+
+                    '<span x-text=\"options.find(o=>o.value===value)?.text||\'-\'\" class=\"text-slate-800 truncate\"></span>'+
                     '<svg class=\"w-4 h-4 text-slate-400 shrink-0 transition-transform\" :class=\"open?\'rotate-180\':\'\'\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path d=\"M19 9l-7 7-7-7\"/></svg>'+
                 '</button>'+
                 '<div x-show=\"open\" @click.outside=\"open=false\" style=\"display:none\" x-transition class=\"fixed z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden origin-top\" style=\"min-width:140px\" data-dd-panel x-init=\"$watch(\'open\',function(v){if(v){ddPos($el.previousElementSibling,$el);}})\">'+
@@ -2880,41 +2824,9 @@ function addRow(type) {
     var tr2 = document.createElement('tr');
     tr2.className = 'item-desc-row border-b border-slate-50 transition-colors';
     tr2.innerHTML =
-        '<td class="px-3 pb-2 pt-1">'+
+        '<td class="px-3 pb-2 pt-1" colspan="6">'+
             '<input type="text" name="items['+rowIndex+'][item_description]" placeholder="Description (optional)" '+
             'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-slate-600 focus:outline-none focus:border-indigo-500 transition placeholder-slate-300">'+
-        '</td>'+
-        '<td class="px-2 pb-2 pt-1" colspan="5">'+
-            '<input type=\"hidden\" name=\"items['+rowIndex+'][classification]\" class=\"item-class\" value=\"\">'+
-            '<div class=\"relative\" x-data=\"lhdnComp(\'\')\">'+
-                '<input type=\"text\" x-ref=\"inp\" '+
-                ':value=\"open ? q : displayLabel\" '+
-                '@focus=\"onFocus()\" '+
-                '@input=\"q=$event.target.value\" '+
-                '@blur=\"onBlur()\" '+
-                '@keydown.escape=\"open=false;q=\'\'\" '+
-                '@keydown.arrow-down.prevent=\"moveDown()\" '+
-                '@keydown.arrow-up.prevent=\"moveUp()\" '+
-                '@keydown.enter.prevent=\"pickActive()\" '+
-                'placeholder=\"LHDN Classification...\" '+
-                'autocomplete=\"off\" '+
-                'data-no-search-convert '+
-                'class=\"w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm focus:outline-none focus:border-indigo-500 transition pr-7\">'+
-                '<svg class=\"absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform\" :class=\"open?\'rotate-180\':\'\'\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path d=\"M19 9l-7 7-7-7\"/></svg>'+
-                '<div x-show=\"open\" @click.outside=\"open=false\" style=\"display:none\" '+
-                'class=\"fixed z-[9996] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden\" '+
-                'data-dd-panel '+
-                'x-init=\"$watch(\'open\',function(v){if(v){ddPos($el.parentElement,$el);}})\">'+
-                    '<ul class=\"max-h-56 overflow-y-auto py-1\" x-ref=\"list\">'+
-                        '<template x-for=\"(o,i) in filteredCodes\" :key=\"o.v\">'+
-                            '<li><button type=\"button\" @mousedown.prevent=\"pickItem(o)\" '+
-                            'class=\"w-full text-left px-3 py-1.5 text-sm transition-colors\" '+
-                            ':class=\"i===activeIdx?\'bg-indigo-50 text-indigo-700 font-medium\':(value===o.v?\'bg-slate-50 text-slate-700 font-medium\':\'text-slate-700 hover:bg-slate-50\')\">'+
-                            '<span x-text=\"o.l\"></span></button></li>'+
-                        '</template>'+
-                    '</ul>'+
-                '</div>'+
-            '</div>'+
         '</td>';
 
     tbody.appendChild(tr);
@@ -2927,10 +2839,10 @@ document.querySelectorAll('.item-row').forEach(function(row) {
     attachRowListeners(row);
     calcRow(row); // recalculate on load so Amount is correct from saved values
 });
-renumberRows(); // fix numbering on load — subtitle/subtotal rows must not count
+renumberRows(); // fix numbering on load - subtitle/subtotal rows must not count
 setTaxMode(taxMode);   // sync tax mode button highlight to saved value
 
-// ── Form submit ───────────────────────────────────────────────────
+// -- Form submit ----------------
 function submitForm(fallback) {
     var ddSel = document.querySelector('.status-dd select');
     document.getElementById('formStatus').value = (ddSel && ddSel.value) ? ddSel.value : fallback;
@@ -2939,7 +2851,7 @@ function submitForm(fallback) {
 
     var form = document.getElementById('invoiceForm');
 
-    // Check if status is cancelled — skip stock check
+    // Check if status is cancelled - skip stock check
     var status = document.getElementById('formStatus').value;
     if (status === 'cancelled') {
         doSaveInvoice(form);
@@ -2962,7 +2874,7 @@ function submitForm(fallback) {
         }
     });
 
-    // No tracked items to check — save directly
+    // No tracked items to check - save directly
     if (checkItems.length === 0) {
         doSaveInvoice(form);
         return;
@@ -3085,11 +2997,11 @@ function showStockWarning(warnings, form) {
     modal.style.display = 'flex';
 }
 
-// ── Item / Product dropdown ──────────────────────────────────────
+// -- Item / Product dropdown ----------------
 // Works exactly like the customer dropdown:
 // - Focus/click: clears input, shows selected name as placeholder, opens full list
 // - Typing: filters list live
-// - Select: sets value, fills price + desc + LHDN class, blurs
+// - Select: sets value, fills price + description, blurs
 // - Blur without select: restores selected name as value (free typing not allowed)
 var _itemDdActive = null;
 var _itemDdIdx    = -1;
@@ -3153,7 +3065,7 @@ function itemDdRender(inp, q) {
 
     list.innerHTML = addRow + resultsHtml;
 
-    // "Add Product" button click — open panel, remember which input to fill
+    // "Add Product" button click - open panel, remember which input to fill
     list.querySelector('[data-add-product]').addEventListener('mousedown', function(e) {
         e.preventDefault();
         _apTargetInput = inp;
@@ -3208,22 +3120,11 @@ function itemDdSelect(inp, product) {
             priceInp.value = product.sale_price ? parseFloat(product.sale_price).toFixed(2) : '';
             calcRow(mainRow);
         }
-        // Row 2: description note + LHDN class
+        // Row 2: description note
         var descRow = mainRow.nextElementSibling;
         if (descRow) {
             var noteInp = descRow.querySelector('[name*="item_description"]');
             if (noteInp) noteInp.value = product.sale_description || '';
-
-            if (product.classification_code) {
-                var hiddenClass = descRow.querySelector('.item-class');
-                if (hiddenClass) hiddenClass.value = product.classification_code;
-                var lhdnWrap = descRow.querySelector('[x-data]');
-                if (lhdnWrap && lhdnWrap._x_dataStack && lhdnWrap._x_dataStack[0]) {
-                    var d = lhdnWrap._x_dataStack[0];
-                    d.value = product.classification_code;
-                    d.q = ''; d.open = false;
-                }
-            }
         }
     }
 
@@ -3322,12 +3223,12 @@ function itemDdKey(e, inp) {
     }, { passive: true });
 })();
 
-// ── Customer autocomplete ─────────────────────────────────────────
+// -- Customer autocomplete ----------------
 function customerSearch() {
     return {
         query:       '',
         selected:    false,
-        ship:        false,   // shipping toggle — set by x-init from PHP
+        ship:        false,   // shipping toggle - set by x-init from PHP
         activeIndex: -1,
         _filtered:   [],
         _open:       false,
@@ -3489,7 +3390,7 @@ function customerSearch() {
                     self.activeIndex = -1;
                     li.classList.remove('bg-indigo-50');
                 });
-                // mousedown fires before blur — use it to select without blur cancelling
+                // mousedown fires before blur - use it to select without blur cancelling
                 li.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     var id = parseInt(li.getAttribute('data-id'));
@@ -3548,7 +3449,7 @@ function customerSearch() {
             var addr = [c.address_line_0, c.address_line_1, c.city, c.postal_code].filter(Boolean).join(', ');
             document.getElementById('f_customer_address').value = addr;
 
-            // ── Auto-fill Billing Attention & Billing Address ──
+            // -- Auto-fill Billing Attention & Billing Address --
             var billingAttn = document.getElementById('f_billing_attention');
             if (billingAttn) {
                 billingAttn.value = (c.default_billing_person || '').toUpperCase();
@@ -3559,7 +3460,7 @@ function customerSearch() {
                 billingAddr.value = fmtAddress(c.default_billing_address);
             }
 
-            // ── Auto-set currency from customer default ──
+            // -- Auto-set currency from customer default --
             if (c.currency) {
                 var currEl = document.getElementById('invoiceCurrencyDd');
                 if (currEl && currEl._x_dataStack && currEl._x_dataStack[0]) {
@@ -3568,12 +3469,12 @@ function customerSearch() {
                 }
             }
 
-            // ── Auto-set payment mode from customer default ──
+            // -- Auto-set payment mode from customer default --
             if (c.default_payment_mode) {
                 setPaymentMode(c.default_payment_mode);
             }
 
-            // ── Auto-set payment term from customer default ──
+            // -- Auto-set payment term from customer default --
             _customerPaymentTermId   = c.payment_term_id   || null;
             _customerPaymentTermName = c.payment_term_name || '';
             var ptEl = document.getElementById('invoicePtDd');
@@ -3585,7 +3486,7 @@ function customerSearch() {
                 }
             }
 
-            // ── Update payment received rows based on customer defaults ──
+            // -- Update payment received rows based on customer defaults --
             // Both cash & credit: ensure one payment row exists with amount = invoice total
             // Credit: pre-fill payment term from customer default
             // Cash: leave payment term for user to select
@@ -3658,7 +3559,7 @@ function customerSearch() {
     };
 }
 
-// ── Reposition customer dropdown on scroll ────────────────────────
+// -- Reposition customer dropdown on scroll ----------------
 (function() {
     var scroller = document.querySelector('main') || window;
     scroller.addEventListener('scroll', function() {
@@ -3673,7 +3574,7 @@ function customerSearch() {
     }, { passive: true });
 })();
 
-// ── Address & shipping auto-fill helpers ─────────────────────────────
+// -- Address & shipping auto-fill helpers ----------------
 function fmtAddress(a) {
     if (!a) return '';
     // Format: street_address, city postcode state, country  (space between city/postcode/state)
@@ -3761,81 +3662,7 @@ function _syncInputFiles() {
     inp.files = _attachedFiles.files;
 }
 
-// ── LHDN Classification combobox ─────────────────────────────────
-function lhdnComp(initialCode) {
-    var all = [{v:'', l:'— No classification —'}].concat(
-        (typeof LHDN_CODES !== 'undefined' ? LHDN_CODES : []).filter(function(o){ return o.v; })
-    );
-    var def = all.find(function(o){ return o.v === initialCode; }) || all[0];
-    return {
-        value:     def.v,
-        q:         '',
-        open:      false,
-        activeIdx: -1,
-        get displayLabel() {
-            if (!this.value) return '';
-            var found = all.find(function(o){ return o.v === this.value; }.bind(this));
-            return found ? found.l : this.value;
-        },
-        get filteredCodes() {
-            var q = this.q.trim().toLowerCase();
-            if (!q) return all;
-            return all.filter(function(o) {
-                return o.l.toLowerCase().includes(q);
-            });
-        },
-        onFocus: function() {
-            this.q         = '';
-            this.open      = true;
-            this.activeIdx = -1;
-        },
-        pickItem: function(o) {
-            this.value     = o.v;
-            this.q         = '';
-            this.open      = false;
-            this.activeIdx = -1;
-            // Sync hidden input
-            var td = this.$el.closest('td');
-            if (td) { var h = td.querySelector('.item-class'); if (h) h.value = o.v; }
-            // Blur so next click fires @focus fresh
-            if (this.$refs && this.$refs.inp) this.$refs.inp.blur();
-        },
-        pickActive: function() {
-            if (this.activeIdx < 0) return;
-            var list = this.filteredCodes;
-            if (list[this.activeIdx]) this.pickItem(list[this.activeIdx]);
-        },
-        moveDown: function() {
-            this.activeIdx = Math.min(this.activeIdx + 1, this.filteredCodes.length - 1);
-            this.scrollActive();
-        },
-        moveUp: function() {
-            this.activeIdx = Math.max(this.activeIdx - 1, 0);
-            this.scrollActive();
-        },
-        scrollActive: function() {
-            var self = this;
-            this.$nextTick(function() {
-                var list = self.$refs.list;
-                if (!list) return;
-                var items = list.querySelectorAll('li');
-                if (items[self.activeIdx]) items[self.activeIdx].scrollIntoView({ block: 'nearest' });
-            });
-        },
-        onBlur: function() {
-            var self = this;
-            setTimeout(function() {
-                if (self.open) {
-                    self.open      = false;
-                    self.q         = '';
-                    self.activeIdx = -1;
-                }
-            }, 200);
-        }
-    };
-}
-
-// ── Currency searchable dropdown ─────────────────────────────────
+// -- Currency searchable dropdown ----------------
 var INVOICE_CURRENCIES = [
     {code:'MYR',name:'Malaysian Ringgit'},{code:'USD',name:'US Dollar'},
     {code:'EUR',name:'Euro'},{code:'GBP',name:'British Pound'},
@@ -3864,9 +3691,9 @@ var INVOICE_CURRENCIES = [
     {code:'MXN',name:'Mexican Peso'},{code:'ARS',name:'Argentine Peso'},
     {code:'CLP',name:'Chilean Peso'},{code:'COP',name:'Colombian Peso'},
     {code:'PEN',name:'Peruvian Sol'},{code:'UYU',name:'Uruguayan Peso'},
-    {code:'BOB',name:'Bolivian Boliviano'},{code:'PYG',name:'Paraguayan Guaraní'},
+    {code:'BOB',name:'Bolivian Boliviano'},{code:'PYG',name:'Paraguayan Guarani'},
     {code:'RUB',name:'Russian Ruble'},{code:'UAH',name:'Ukrainian Hryvnia'},
-    {code:'PLN',name:'Polish Złoty'},{code:'CZK',name:'Czech Koruna'},
+    {code:'PLN',name:'Polish ZZloty'},{code:'CZK',name:'Czech Koruna'},
     {code:'HUF',name:'Hungarian Forint'},{code:'RON',name:'Romanian Leu'},
     {code:'BGN',name:'Bulgarian Lev'},{code:'HRK',name:'Croatian Kuna'},
     {code:'RSD',name:'Serbian Dinar'},{code:'TRY',name:'Turkish Lira'},
@@ -3874,22 +3701,22 @@ var INVOICE_CURRENCIES = [
     {code:'IQD',name:'Iraqi Dinar'},{code:'LBP',name:'Lebanese Pound'},
     {code:'SYP',name:'Syrian Pound'},{code:'YER',name:'Yemeni Rial'},
     {code:'AFN',name:'Afghan Afghani'},{code:'NPR',name:'Nepalese Rupee'},
-    {code:'MNT',name:'Mongolian Tögrög'},{code:'KZT',name:'Kazakhstani Tenge'},
-    {code:'UZS',name:'Uzbekistani Soʻm'},{code:'GEL',name:'Georgian Lari'},
+    {code:'MNT',name:'Mongolian Togrog'},{code:'KZT',name:'Kazakhstani Tenge'},
+    {code:'UZS',name:'Uzbekistani Som'},{code:'GEL',name:'Georgian Lari'},
     {code:'AMD',name:'Armenian Dram'},{code:'AZN',name:'Azerbaijani Manat'},
     {code:'BYN',name:'Belarusian Ruble'},{code:'MDL',name:'Moldovan Leu'},
     {code:'MKD',name:'Macedonian Denar'},{code:'ALL',name:'Albanian Lek'},
     {code:'BAM',name:'Bosnia-Herzegovina Convertible Mark'},
-    {code:'ISK',name:'Icelandic Króna'},{code:'XCD',name:'East Caribbean Dollar'},
+    {code:'ISK',name:'Icelandic Krona'},{code:'XCD',name:'East Caribbean Dollar'},
     {code:'JMD',name:'Jamaican Dollar'},{code:'TTD',name:'Trinidad & Tobago Dollar'},
     {code:'BBD',name:'Barbadian Dollar'},{code:'BSD',name:'Bahamian Dollar'},
     {code:'HTG',name:'Haitian Gourde'},{code:'CUP',name:'Cuban Peso'},
     {code:'DOP',name:'Dominican Peso'},{code:'GTQ',name:'Guatemalan Quetzal'},
-    {code:'HNL',name:'Honduran Lempira'},{code:'NIO',name:'Nicaraguan Córdoba'},
-    {code:'CRC',name:'Costa Rican Colón'},{code:'PAB',name:'Panamanian Balboa'},
+    {code:'HNL',name:'Honduran Lempira'},{code:'NIO',name:'Nicaraguan Cordoba'},
+    {code:'CRC',name:'Costa Rican Colon'},{code:'PAB',name:'Panamanian Balboa'},
     {code:'PGK',name:'Papua New Guinean Kina'},{code:'FJD',name:'Fijian Dollar'},
     {code:'SBD',name:'Solomon Islands Dollar'},{code:'VUV',name:'Vanuatu Vatu'},
-    {code:'WST',name:'Samoan Tālā'},{code:'TOP',name:'Tongan Paʻanga'},
+    {code:'WST',name:'Samoan Tala'},{code:'TOP',name:'Tongan Paanga'},
 ];
 
 
@@ -3906,7 +3733,7 @@ function invoiceCurrencyComp(initialCode) {
         q:         '',
         open:      false,
         activeIdx: -1,
-        selected:  { code: def.code, label: def.code + ' — ' + def.name },
+        selected:  { code: def.code, label: def.code + ' - ' + def.name },
         currencies: sorted,
         get filtered() {
             var q = this.q.trim().toLowerCase();
@@ -3935,10 +3762,9 @@ function invoiceCurrencyComp(initialCode) {
             if (inp) inp.blur();
         },
         pickActive: function() {
-            // Only pick if user explicitly moved to a row with arrow keys
-            if (this.activeIdx < 0) return;
             var list = this.filtered;
-            if (list[this.activeIdx]) this.pick(list[this.activeIdx]);
+            var idx = this.activeIdx >= 0 ? this.activeIdx : 0;
+            if (list[idx]) this.pick(list[idx]);
         },
         moveDown: function() {
             this.activeIdx = Math.min(this.activeIdx + 1, this.filtered.length - 1);
@@ -3970,7 +3796,7 @@ function invoiceCurrencyComp(initialCode) {
     };
 }
 
-// ── Invoice Payment Term dropdown component ──────────────────────────
+// -- Invoice Payment Term dropdown component ----------------
 function invoicePtComp() {
     return {
         open:        false,
@@ -4009,7 +3835,7 @@ function invoicePtComp() {
     };
 }
 
-// ── Invoice number dropdown ───────────────────────────────────────
+// -- Invoice number dropdown ----------------
 var _invoiceNoDdOpen = false;
 var _invoiceNoDdActiveId = <?= $defaultFormatId ?: 0 ?>;
 
@@ -4065,9 +3891,9 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// ── end invoice number dropdown ──────────────────────────────────
+// -- end invoice number dropdown ----------------
 
-// ── Payment Mode toggle ───────────────────────────────────────────
+// -- Payment Mode toggle ----------------
 function setPaymentMode(mode) {
     document.getElementById('invoicePaymentMode').value = mode;
     var cashBtn   = document.getElementById('pmCash');
@@ -4100,7 +3926,7 @@ function setPaymentMode(mode) {
 
 updateTotals();
 
-// ── Payment Received ─────────────────────────────────────────────
+// -- Payment Received ----------------
 var pmtRowIndex = <?= count($existingPayments) ?>;
 
 // Remove all payment received rows
@@ -4267,9 +4093,9 @@ updatePaymentTotal();
 
 <?php endif; // end action switch ?>
 
-<!-- ══════════════════════════════════════════════════════════════
+<!-- ================
      QUICK ADD CUSTOMER PANEL (slide-in from right)
-     ══════════════════════════════════════════════════════════════ -->
+     ================ -->
 <?php if ($action !== 'list'): ?>
 
 <!-- Backdrop -->
@@ -4287,7 +4113,7 @@ updatePaymentTotal();
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
         <div>
             <h2 id="qaPanelTitle" class="text-base font-semibold text-slate-800">New Customer</h2>
-            <p id="qaPanelSub" class="text-xs text-slate-400 mt-0.5">Full profile — same as Customers → New Customer.</p>
+            <p id="qaPanelSub" class="text-xs text-slate-400 mt-0.5">Full profile - same as Customers -> New Customer.</p>
         </div>
         <button type="button" onclick="closeQuickAdd()"
                 class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors text-xl font-light">&times;</button>
@@ -4296,7 +4122,7 @@ updatePaymentTotal();
     <!-- Scrollable body -->
     <div class="flex-1 overflow-y-auto" id="qaPanelBody">
 
-        <!-- Hidden edit ID — 0 means new, >0 means edit -->
+        <!-- Hidden edit ID - 0 means new, >0 means edit -->
         <input type="hidden" id="qa_customer_id" value="0">
 
         <!-- Error banner -->
@@ -4306,7 +4132,7 @@ updatePaymentTotal();
             <span id="qaErrorMsg"></span>
         </div>
 
-        <!-- ── Basic Information ── -->
+        <!-- -- Basic Information -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Basic Information</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -4379,7 +4205,7 @@ updatePaymentTotal();
             </div>
         </div>
 
-        <!-- ── Contact Persons ── -->
+        <!-- -- Contact Persons -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100" x-data="qaPersonsComp()">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Persons</h3>
@@ -4423,7 +4249,7 @@ updatePaymentTotal();
             </div>
         </div>
 
-        <!-- ── Contact Addresses ── -->
+        <!-- -- Contact Addresses -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100" x-data="qaAddressesComp()">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Addresses</h3>
@@ -4490,7 +4316,7 @@ updatePaymentTotal();
             </div>
         </div>
 
-        <!-- ── Contact Information ── -->
+        <!-- -- Contact Information -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100" x-data="qaContactInfoComp()" id="qaContactInfoSection">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Contact Information</h3>
             <div class="grid grid-cols-2 gap-6">
@@ -4591,13 +4417,13 @@ updatePaymentTotal();
             </div>
         </div>
 
-        <!-- ── Default Settings ── -->
+        <!-- -- Default Settings -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Default Settings</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
 
                 <!-- Currency -->
-                <div x-data="{cOpen:false,cVal:'MYR',cLabel:'MYR — Malaysian Ringgit',cQ:''}">
+                <div x-data="{cOpen:false,cVal:'MYR',cLabel:'MYR - Malaysian Ringgit',cQ:''}">
                     <label class="<?= t('label') ?>">Currency</label>
                     <div class="relative">
                         <button type="button" @click="cOpen=!cOpen" @keydown.escape="cOpen=false" style="outline:none"
@@ -4708,7 +4534,7 @@ updatePaymentTotal();
                                         <button type="button" @click="select('','')"
                                                 class="w-full text-left px-3 py-1.5 text-sm transition-colors"
                                                 :class="selectedId==='' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-400 hover:bg-slate-50'">
-                                            — None —
+                                            - None -
                                         </button>
                                     </li>
                                     <template x-for="pt in list" :key="pt.id">
@@ -4736,7 +4562,7 @@ updatePaymentTotal();
                     <div x-data="{open:false}">
                         <button type="button" style="outline:none"
                                 class="w-full h-9 px-3 rounded-lg bg-white border border-slate-300 text-left flex items-center justify-between text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-400">
-                            <span class="text-slate-400">— Coming soon —</span>
+                            <span class="text-slate-400">- Coming soon -</span>
                             <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                         </button>
                     </div>
@@ -4748,7 +4574,7 @@ updatePaymentTotal();
                     <div>
                         <button type="button" style="outline:none"
                                 class="w-full h-9 px-3 rounded-lg bg-white border border-slate-300 text-left flex items-center justify-between text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-400">
-                            <span class="text-slate-400">— Coming soon —</span>
+                            <span class="text-slate-400">- Coming soon -</span>
                             <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                         </button>
                     </div>
@@ -4760,7 +4586,7 @@ updatePaymentTotal();
                     <div>
                         <button type="button" style="outline:none"
                                 class="w-full h-9 px-3 rounded-lg bg-white border border-slate-300 text-left flex items-center justify-between text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-400">
-                            <span class="text-slate-400">— Coming soon —</span>
+                            <span class="text-slate-400">- Coming soon -</span>
                             <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                         </button>
                     </div>
@@ -4772,7 +4598,7 @@ updatePaymentTotal();
                     <div>
                         <button type="button" style="outline:none"
                                 class="w-full h-9 px-3 rounded-lg bg-white border border-slate-300 text-left flex items-center justify-between text-sm focus:outline-none focus:border-indigo-500 transition hover:border-slate-400">
-                            <span class="text-slate-400">— Coming soon —</span>
+                            <span class="text-slate-400">- Coming soon -</span>
                             <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                         </button>
                     </div>
@@ -4781,7 +4607,7 @@ updatePaymentTotal();
             </div>
         </div>
 
-        <!-- ── Remarks ── -->
+        <!-- -- Remarks -- -->
         <div class="px-6 pt-5 pb-6">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Remarks</h3>
             <label class="<?= t('label') ?>">Notes</label>
@@ -4805,9 +4631,9 @@ updatePaymentTotal();
 </div><!-- /qaPanel -->
 
 <script>
-// ── qaPos: position a fixed-inside-transformed-panel dropdown ──
+// -- qaPos: position a fixed-inside-transformed-panel dropdown --
 // fixed children of a CSS-transformed ancestor use the ancestor as their
-// containing block, so top/left are relative to the panel — not the viewport.
+// containing block, so top/left are relative to the panel - not the viewport.
 // getBoundingClientRect() returns viewport coords, so we subtract the panel's
 // viewport offset to get panel-relative coordinates.
 function qaPos(trigger, panel, withWidth) {
@@ -4840,7 +4666,7 @@ function qaPos(trigger, panel, withWidth) {
     });
 })();
 
-// ── Quick Add: Country codes & Currencies (prefixed to avoid conflicts) ──
+// -- Quick Add: Country codes & Currencies (prefixed to avoid conflicts) --
 var QA_COUNTRY_CODES = [
     {code:'+60',label:'Malaysia'},{code:'+65',label:'Singapore'},{code:'+62',label:'Indonesia'},
     {code:'+66',label:'Thailand'},{code:'+63',label:'Philippines'},{code:'+84',label:'Vietnam'},
@@ -4861,24 +4687,24 @@ var QA_COUNTRY_CODES = [
 ];
 
 var QA_CURRENCIES = [
-    {c:'MYR',l:'MYR — Malaysian Ringgit'},{c:'USD',l:'USD — US Dollar'},
-    {c:'EUR',l:'EUR — Euro'},{c:'GBP',l:'GBP — British Pound'},
-    {c:'JPY',l:'JPY — Japanese Yen'},{c:'CNY',l:'CNY — Chinese Yuan'},
-    {c:'SGD',l:'SGD — Singapore Dollar'},{c:'AUD',l:'AUD — Australian Dollar'},
-    {c:'CAD',l:'CAD — Canadian Dollar'},{c:'CHF',l:'CHF — Swiss Franc'},
-    {c:'HKD',l:'HKD — Hong Kong Dollar'},{c:'NZD',l:'NZD — New Zealand Dollar'},
-    {c:'AED',l:'AED — UAE Dirham'},{c:'SAR',l:'SAR — Saudi Riyal'},
-    {c:'THB',l:'THB — Thai Baht'},{c:'IDR',l:'IDR — Indonesian Rupiah'},
-    {c:'PHP',l:'PHP — Philippine Peso'},{c:'VND',l:'VND — Vietnamese Dong'},
-    {c:'KRW',l:'KRW — South Korean Won'},{c:'INR',l:'INR — Indian Rupee'},
-    {c:'BND',l:'BND — Brunei Dollar'},{c:'TWD',l:'TWD — New Taiwan Dollar'},
-    {c:'TRY',l:'TRY — Turkish Lira'},{c:'ILS',l:'ILS — Israeli Shekel'},
-    {c:'RUB',l:'RUB — Russian Ruble'},{c:'PLN',l:'PLN — Polish Zloty'},
-    {c:'ZAR',l:'ZAR — South African Rand'},{c:'BRL',l:'BRL — Brazilian Real'},
-    {c:'MXN',l:'MXN — Mexican Peso'},
+    {c:'MYR',l:'MYR - Malaysian Ringgit'},{c:'USD',l:'USD - US Dollar'},
+    {c:'EUR',l:'EUR - Euro'},{c:'GBP',l:'GBP - British Pound'},
+    {c:'JPY',l:'JPY - Japanese Yen'},{c:'CNY',l:'CNY - Chinese Yuan'},
+    {c:'SGD',l:'SGD - Singapore Dollar'},{c:'AUD',l:'AUD - Australian Dollar'},
+    {c:'CAD',l:'CAD - Canadian Dollar'},{c:'CHF',l:'CHF - Swiss Franc'},
+    {c:'HKD',l:'HKD - Hong Kong Dollar'},{c:'NZD',l:'NZD - New Zealand Dollar'},
+    {c:'AED',l:'AED - UAE Dirham'},{c:'SAR',l:'SAR - Saudi Riyal'},
+    {c:'THB',l:'THB - Thai Baht'},{c:'IDR',l:'IDR - Indonesian Rupiah'},
+    {c:'PHP',l:'PHP - Philippine Peso'},{c:'VND',l:'VND - Vietnamese Dong'},
+    {c:'KRW',l:'KRW - South Korean Won'},{c:'INR',l:'INR - Indian Rupee'},
+    {c:'BND',l:'BND - Brunei Dollar'},{c:'TWD',l:'TWD - New Taiwan Dollar'},
+    {c:'TRY',l:'TRY - Turkish Lira'},{c:'ILS',l:'ILS - Israeli Shekel'},
+    {c:'RUB',l:'RUB - Russian Ruble'},{c:'PLN',l:'PLN - Polish Zloty'},
+    {c:'ZAR',l:'ZAR - South African Rand'},{c:'BRL',l:'BRL - Brazilian Real'},
+    {c:'MXN',l:'MXN - Mexican Peso'},
 ];
 
-// ── Alpine components (qa-scoped) ──────────────────────────────────
+// -- Alpine components (qa-scoped) ----------------
 function qaComp() { return {}; }
 
 function qaIdTypeComp() {
@@ -4944,7 +4770,7 @@ function qaContactInfoComp() {
     };
 }
 
-// ── Panel open / close ─────────────────────────────────────────────
+// -- Panel open / close ----------------
 function openQuickAdd() {
     var dd = document.getElementById('customerDropdown');
     if (dd) dd.style.display = 'none';
@@ -4988,7 +4814,7 @@ function openQuickEdit() {
 
     qaReset();
 
-    // Set edit mode UI — must be AFTER qaReset() which resets these to "new" state
+    // Set edit mode UI - must be AFTER qaReset() which resets these to "new" state
     document.getElementById('qaPanelTitle').textContent = 'Edit Customer';
     document.getElementById('qaPanelSub').textContent   = 'Update details for ' + c.customer_name;
     document.getElementById('qaSaveBtn').textContent    = 'Save Changes';
@@ -5135,7 +4961,7 @@ function qaReset() {
     var cidEl = document.getElementById('qa_customer_id');
     if (cidEl) cidEl.value = '0';
     document.getElementById('qaPanelTitle').textContent = 'New Customer';
-    document.getElementById('qaPanelSub').textContent   = 'Full profile — same as Customers → New Customer.';
+    document.getElementById('qaPanelSub').textContent   = 'Full profile - same as Customers -> New Customer.';
     document.getElementById('qaSaveBtn').textContent    = 'Save & Select';
 
     // Reset plain inputs
@@ -5185,7 +5011,7 @@ function qaReset() {
             // Currency dropdown
             if (typeof d.cVal !== 'undefined') {
                 d.cVal = 'MYR';
-                d.cLabel = 'MYR — Malaysian Ringgit';
+                d.cLabel = 'MYR - Malaysian Ringgit';
                 d.cQ = '';
             }
         });
@@ -5202,7 +5028,7 @@ function qaReset() {
     if (body) body.scrollTop = 0;
 }
 
-// ── Collect contact section data ───────────────────────────────────
+// -- Collect contact section data ----------------
 function qaCollectPersons() {
     // Read directly from Alpine state so checkboxes (default_billing/shipping) are included
     var sec = document.getElementById('qaPanel');
@@ -5297,7 +5123,7 @@ function qaCollectPhones() {
     return phones;
 }
 
-// ── Submit ─────────────────────────────────────────────────────────
+// -- Submit ----------------
 function submitQuickAdd() {
     var name = document.getElementById('qa_legalname').value.trim();
     if (!name) {
@@ -5404,9 +5230,9 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 
-<!-- ══════════════════════════════════════════════════════════════
+<!-- ================
      ADD PRODUCT PANEL (slide-in from right)
-     ══════════════════════════════════════════════════════════════ -->
+     ================ -->
 
 <!-- Backdrop -->
 <div id="apBackdrop" onclick="closeAddProduct()"
@@ -5438,7 +5264,7 @@ document.addEventListener('keydown', function(e) {
             <span id="apErrorMsg"></span>
         </div>
 
-        <!-- ── Basic Information ── -->
+        <!-- -- Basic Information -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Basic Information</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -5461,7 +5287,7 @@ document.addEventListener('keydown', function(e) {
             </div>
         </div>
 
-        <!-- ── Classification Code ── -->
+        <!-- Classification Code -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Classification Code</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -5506,7 +5332,7 @@ document.addEventListener('keydown', function(e) {
             </div>
         </div>
 
-        <!-- ── Sale Information ── -->
+        <!-- -- Sale Information -- -->
         <div class="px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Sale Information</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -5520,24 +5346,24 @@ document.addEventListener('keydown', function(e) {
                 </div>
                 <div>
                     <label class="<?= t('label') ?>">Sales Tax</label>
-                    <div class="relative" x-data="{open:false,value:'',options:<?= json_encode(array_merge([['value'=>'','text'=>'— None —']], array_map(fn($t)=>['value'=>(string)$t['id'],'text'=>$t['name'].' ('.number_format((float)$t['rate'],2).'%)'], $taxRates)), JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT) ?>}">
-                        <button type="button" @click="open=!open" @keydown.escape="open=false"
+                    <div class="relative">
+                        <button type="button" onclick="toggleApSalesTax(event)" onkeydown="if(event.key==='Escape')closeApSalesTax()"
                                 class="<?= t('input') ?> text-left flex items-center justify-between">
-                            <span x-text="options.find(o=>o.value===value)?.text||'— None —'" :class="value?'text-black':'text-slate-400'"></span>
-                            <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="open?'rotate-180':''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                            <span id="ap_sales_tax_label" class="text-slate-400">None</span>
+                            <svg id="ap_sales_tax_chevron" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        <div x-show="open" @click.outside="open=false" style="display:none"
+                        <div id="ap_sales_tax_menu" style="display:none"
                              class="absolute z-[10000] left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
                             <ul class="max-h-48 overflow-y-auto py-1">
-                                <template x-for="o in options" :key="o.value">
-                                    <li>
-                                        <button type="button" @click="value=o.value;open=false;document.getElementById('ap_sales_tax').value=o.value"
-                                                class="w-full text-left px-3 py-1.5 text-sm transition-colors"
-                                                :class="value===o.value?'bg-indigo-50 text-indigo-700 font-medium':'text-slate-700 hover:bg-slate-50'">
-                                            <span x-text="o.text"></span>
-                                        </button>
-                                    </li>
-                                </template>
+                                <li>
+                                    <button type="button" onclick="setApSalesTax('', 'None')" class="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">None</button>
+                                </li>
+                                <?php foreach ($taxRates as $_tr): ?>
+                                <?php $taxLabel = $_tr['name'].' ('.number_format((float)$_tr['rate'], 2).'%)'; ?>
+                                <li>
+                                    <button type="button" onclick='setApSalesTax(<?= json_encode((string)$_tr['id'], JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($taxLabel, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' class="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"><?= e($taxLabel) ?></button>
+                                </li>
+                                <?php endforeach; ?>
                             </ul>
                         </div>
                         <input type="hidden" id="ap_sales_tax" value="">
@@ -5551,7 +5377,7 @@ document.addEventListener('keydown', function(e) {
             </div>
         </div>
 
-        <!-- ── Other Information ── -->
+        <!-- -- Other Information -- -->
         <div class="px-6 pt-5 pb-6">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Other Information</h3>
             <div class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -5585,7 +5411,7 @@ document.addEventListener('keydown', function(e) {
 </div><!-- /apPanel -->
 
 <script>
-// ── apPos: position fixed dropdown within the transformed apPanel ──
+// -- apPos: position fixed dropdown within the transformed apPanel --
 function apPos(trigger, panel) {
     var panelEl = document.getElementById('apPanel');
     var pr = panelEl ? panelEl.getBoundingClientRect() : {top:0,left:0};
@@ -5615,39 +5441,95 @@ function apPos(trigger, panel) {
     });
 })();
 
-// ── LHDN combobox for Add Product panel ──
+// -- LHDN combobox for Add Product panel --
+// -- Open / Close --
+const AP_LHDN_CODES = <?= json_encode(
+    array_map(
+        fn($code, $desc) => ['v' => (string)$code, 'l' => (string)$code.' - '.$desc],
+        array_keys($lhdnDesc),
+        array_values($lhdnDesc)
+    ),
+    JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT
+) ?>;
+
+function closeApSalesTax() {
+    var menu = document.getElementById('ap_sales_tax_menu');
+    var chev = document.getElementById('ap_sales_tax_chevron');
+    if (menu) menu.style.display = 'none';
+    if (chev) chev.classList.remove('rotate-180');
+}
+
+function toggleApSalesTax(event) {
+    if (event) event.stopPropagation();
+    var menu = document.getElementById('ap_sales_tax_menu');
+    var chev = document.getElementById('ap_sales_tax_chevron');
+    if (!menu) return;
+    var open = menu.style.display !== 'none';
+    menu.style.display = open ? 'none' : 'block';
+    if (chev) chev.classList.toggle('rotate-180', !open);
+}
+
+function setApSalesTax(value, label) {
+    var input = document.getElementById('ap_sales_tax');
+    var text = document.getElementById('ap_sales_tax_label');
+    if (input) input.value = value || '';
+    if (text) {
+        text.textContent = label || 'None';
+        text.className = value ? 'text-black' : 'text-slate-400';
+    }
+    closeApSalesTax();
+}
+
+document.addEventListener('click', function(e) {
+    var menu = document.getElementById('ap_sales_tax_menu');
+    if (!menu || menu.style.display === 'none') return;
+    var wrap = menu.parentElement;
+    if (wrap && wrap.contains(e.target)) return;
+    closeApSalesTax();
+});
+
 function apLhdnComp() {
-    var all = [{v:'', l:'— No classification —'}].concat(
-        (typeof LHDN_CODES !== 'undefined' ? LHDN_CODES : []).filter(function(o){ return o.v; })
-    );
+    var all = [{v:'', l:'- No classification -'}].concat(AP_LHDN_CODES || []);
     return {
         value: '', q: '', open: false, activeIdx: -1,
         get displayLabel() {
             if (!this.value) return '';
-            var f = all.find(function(o){ return o.v === this.value; }.bind(this));
-            return f ? f.l : this.value;
+            var found = all.find(function(o){ return o.v === this.value; }.bind(this));
+            return found ? found.l : this.value;
         },
         get filteredCodes() {
             var q = this.q.trim().toLowerCase();
             return q ? all.filter(function(o){ return o.l.toLowerCase().includes(q); }) : all;
         },
-        onFocus() { this.q=''; this.open=true; this.activeIdx=-1; },
-        pickItem(o) {
-            this.value=o.v; this.q=''; this.open=false; this.activeIdx=-1;
+        onFocus: function() { this.q = ''; this.open = true; this.activeIdx = -1; },
+        pickItem: function(o) {
+            this.value = o.v; this.q = ''; this.open = false; this.activeIdx = -1;
             if (this.$refs && this.$refs.inp) this.$refs.inp.blur();
         },
-        pickActive() { if(this.activeIdx>=0&&this.filteredCodes[this.activeIdx]) this.pickItem(this.filteredCodes[this.activeIdx]); },
-        moveDown() { this.activeIdx=Math.min(this.activeIdx+1,this.filteredCodes.length-1); this.scrollActive(); },
-        moveUp()   { this.activeIdx=Math.max(this.activeIdx-1,0); this.scrollActive(); },
-        scrollActive() {
-            var self=this;
-            this.$nextTick(function(){ var l=self.$refs.list; if(!l)return; var li=l.querySelectorAll('li')[self.activeIdx]; if(li)li.scrollIntoView({block:'nearest'}); });
+        pickActive: function() {
+            var idx = this.activeIdx >= 0 ? this.activeIdx : 0;
+            if (this.filteredCodes[idx]) this.pickItem(this.filteredCodes[idx]);
         },
-        onBlur() { var self=this; setTimeout(function(){ if(self.open){self.open=false;self.q='';self.activeIdx=-1;} },200); }
+        moveDown: function() { this.activeIdx = Math.min(this.activeIdx + 1, this.filteredCodes.length - 1); this.scrollActive(); },
+        moveUp: function() { this.activeIdx = Math.max(this.activeIdx - 1, 0); this.scrollActive(); },
+        scrollActive: function() {
+            var self = this;
+            this.$nextTick(function() {
+                var list = self.$refs.list;
+                if (!list) return;
+                var li = list.querySelectorAll('li')[self.activeIdx];
+                if (li) li.scrollIntoView({block:'nearest'});
+            });
+        },
+        onBlur: function() {
+            var self = this;
+            setTimeout(function() {
+                if (self.open) { self.open = false; self.q = ''; self.activeIdx = -1; }
+            }, 160);
+        }
     };
 }
 
-// ── Open / Close ──
 function closeImportItemsMenu() {
     var menu = document.getElementById('importItemsMenu');
     var chevron = document.getElementById('importItemsChevron');
@@ -5680,6 +5562,10 @@ var _quotationCustomerOptions = [];
 var _quotationCustomerFiltered = [];
 var _quotationCustomerActiveIdx = -1;
 var _quotationCustomerBlurTimer = null;
+var _quotationImportReturnToTransfer = false;
+var _quotationTransferQuotes = {};
+var _quotationTransferOrder = [];
+var _quotationTransferItems = {};
 
 function quotationImportEsc(val) {
     return val == null ? '' : String(val)
@@ -5848,7 +5734,7 @@ function renderQuotationImportRows() {
     body.innerHTML = _quotationImportFiltered.map(function(q) {
         var id = String(q.id);
         var checked = _quotationImportSelection[id] ? ' checked' : '';
-        var desc = q.description && String(q.description).trim() !== '' ? q.description : '—';
+        var desc = q.description && String(q.description).trim() !== '' ? q.description : '-';
         return '' +
             '<tr class="border-b border-slate-100 qi-row">' +
                 '<td class="px-2 py-3 align-middle">' +
@@ -5897,9 +5783,14 @@ function autoApplyQuotationImportFiltersIfValid() {
     applyQuotationImportFilters();
 }
 
-function openQuotationImportModal() {
+function openQuotationImportModal(returnToTransfer) {
     var modal = document.getElementById('quotationImportModal');
     if (!modal) return;
+    _quotationImportReturnToTransfer = !!returnToTransfer;
+    _quotationImportSelection = {};
+    _quotationTransferOrder.forEach(function(id) {
+        _quotationImportSelection[String(id)] = true;
+    });
     populateQuotationImportCustomers();
     var currentCustomer = '';
     var invoiceCustomerHidden = document.getElementById('f_customer_name');
@@ -5914,6 +5805,7 @@ function resetQuotationImportModal() {
     _quotationImportSelection = {};
     _quotationImportFiltered = [];
     _quotationCustomerActiveIdx = -1;
+    _quotationImportReturnToTransfer = false;
 
     var customerHidden = document.getElementById('qiCustomerFilter');
     var customerInput = document.getElementById('qiCustomerInput');
@@ -5947,6 +5839,11 @@ function closeQuotationImportModal() {
     var modal = document.getElementById('quotationImportModal');
     if (!modal) return;
     modal.style.display = 'none';
+    if (_quotationImportReturnToTransfer) {
+        resetQuotationImportModal();
+        openQuotationTransferModal(false);
+        return;
+    }
     resetQuotationImportModal();
 }
 
@@ -5960,6 +5857,227 @@ function toggleQuotationImportSelectAll(checked) {
         _quotationImportSelection[String(q.id)] = !!checked;
     });
     renderQuotationImportRows();
+}
+
+function quotationTransferKey(qid, idx) {
+    return String(qid) + ':' + String(idx);
+}
+
+function quotationTransferNormalItems(q) {
+    return (q.items || []).map(function(item, idx) {
+        return { item: item, idx: idx };
+    }).filter(function(entry) {
+        return (entry.item.row_type || 'item') === 'item';
+    });
+}
+
+function quotationTransferQty(item) {
+    var qty = parseFloat(item.quantity || 0);
+    return qty > 0 ? qty : 0;
+}
+
+function addQuotationsToTransfer(quotes) {
+    quotes.forEach(function(q) {
+        var id = String(q.id);
+        if (!_quotationTransferQuotes[id]) {
+            _quotationTransferQuotes[id] = q;
+            _quotationTransferOrder.push(id);
+        }
+        quotationTransferNormalItems(q).forEach(function(entry) {
+            var key = quotationTransferKey(id, entry.idx);
+            if (!_quotationTransferItems[key]) {
+                _quotationTransferItems[key] = { selected: false, applyQty: '' };
+            }
+        });
+    });
+}
+
+function resetQuotationTransferState() {
+    _quotationTransferQuotes = {};
+    _quotationTransferOrder = [];
+    _quotationTransferItems = {};
+}
+
+function openQuotationTransferModal(shouldRender) {
+    var modal = document.getElementById('quotationTransferModal');
+    if (!modal) return;
+    if (shouldRender !== false) renderQuotationTransferModal();
+    modal.style.display = 'flex';
+}
+
+function closeQuotationTransferModal(resetState) {
+    var modal = document.getElementById('quotationTransferModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    if (resetState) {
+        resetQuotationTransferState();
+        renderQuotationTransferModal();
+    }
+}
+
+function addMoreQuotationToTransfer() {
+    closeQuotationTransferModal(false);
+    openQuotationImportModal(true);
+}
+
+function removeQuotationFromTransfer(qid) {
+    var id = String(qid);
+    delete _quotationTransferQuotes[id];
+    _quotationTransferOrder = _quotationTransferOrder.filter(function(existing) { return existing !== id; });
+    Object.keys(_quotationTransferItems).forEach(function(key) {
+        if (key.indexOf(id + ':') === 0) delete _quotationTransferItems[key];
+    });
+    renderQuotationTransferModal();
+}
+
+function toggleQuotationTransferItem(key, checked) {
+    var state = _quotationTransferItems[key] || { selected: false, applyQty: '' };
+    state.selected = !!checked;
+    if (state.selected && (state.applyQty === '' || parseFloat(state.applyQty || 0) <= 0)) {
+        var parts = key.split(':');
+        var q = _quotationTransferQuotes[parts[0]];
+        var item = q && q.items ? q.items[parseInt(parts[1], 10)] : null;
+        state.applyQty = item ? quotationTransferQty(item).toFixed(2) : '';
+    }
+    if (!state.selected) state.applyQty = '';
+    _quotationTransferItems[key] = state;
+    renderQuotationTransferModal();
+}
+
+function toggleQuotationTransferQuote(qid, checked) {
+    var id = String(qid);
+    var q = _quotationTransferQuotes[id];
+    if (!q) return;
+    quotationTransferNormalItems(q).forEach(function(entry) {
+        var key = quotationTransferKey(id, entry.idx);
+        var state = _quotationTransferItems[key] || { selected: false, applyQty: '' };
+        state.selected = !!checked;
+        state.applyQty = checked ? quotationTransferQty(entry.item).toFixed(2) : '';
+        _quotationTransferItems[key] = state;
+    });
+    renderQuotationTransferModal();
+}
+
+function setQuotationTransferQty(key, value) {
+    var state = _quotationTransferItems[key] || { selected: false, applyQty: '' };
+    var parts = key.split(':');
+    var q = _quotationTransferQuotes[parts[0]];
+    var item = q && q.items ? q.items[parseInt(parts[1], 10)] : null;
+    var max = item ? quotationTransferQty(item) : 0;
+    var qty = parseFloat(value || 0);
+    if (!isFinite(qty) || qty < 0) qty = 0;
+    if (max > 0 && qty > max) qty = max;
+    state.applyQty = qty > 0 ? qty.toFixed(2) : '';
+    state.selected = qty > 0;
+    _quotationTransferItems[key] = state;
+    renderQuotationTransferModal();
+}
+
+function renderQuotationTransferModal() {
+    var body = document.getElementById('quotationTransferBody');
+    var empty = document.getElementById('quotationTransferEmpty');
+    var hint = document.getElementById('quotationTransferHint');
+    var btn = document.getElementById('quotationTransferConfirmBtn');
+    if (!body) return;
+
+    var selectedCount = 0;
+    var quoteHtml = _quotationTransferOrder.map(function(qid) {
+        var q = _quotationTransferQuotes[qid];
+        if (!q) return '';
+        var entries = quotationTransferNormalItems(q);
+        var itemKeys = entries.map(function(entry) { return quotationTransferKey(qid, entry.idx); });
+        var quoteSelected = itemKeys.length > 0 && itemKeys.every(function(key) { return _quotationTransferItems[key] && _quotationTransferItems[key].selected; });
+        var quotePartial = itemKeys.some(function(key) { return _quotationTransferItems[key] && _quotationTransferItems[key].selected; });
+        var rows = entries.length ? entries.map(function(entry) {
+            var item = entry.item;
+            var key = quotationTransferKey(qid, entry.idx);
+            var state = _quotationTransferItems[key] || { selected: false, applyQty: '' };
+            var qty = quotationTransferQty(item);
+            if (state.selected) selectedCount++;
+            var rowClass = state.selected ? 'bg-emerald-50/70' : 'bg-white hover:bg-slate-50/70';
+            var note = item.item_description ? '<div class="text-xs text-slate-500 mt-1">' + quotationImportEsc(item.item_description) + '</div>' : '';
+            return '' +
+                '<tr class="border-b border-slate-100 transition-colors ' + rowClass + '">' +
+                    '<td class="px-2 py-3 align-top">' +
+                        '<input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" ' + (state.selected ? 'checked' : '') +
+                        ' onchange="toggleQuotationTransferItem(\'' + key + '\', this.checked)">' +
+                    '</td>' +
+                    '<td class="px-2 py-3 align-top text-slate-800">' +
+                        '<div class="font-medium">' + quotationImportEsc(item.description || '') + '</div>' + note +
+                    '</td>' +
+                    '<td class="px-2 py-3 align-top text-right text-slate-800 font-medium">' + quotationImportMoney(item.unit_price) + '</td>' +
+                    '<td class="px-2 py-3 align-top text-right text-slate-700">' + qty.toFixed(2) + ' <span class="text-xs text-slate-400">unit</span></td>' +
+                    '<td class="px-2 py-3 align-top text-right text-slate-700">' + qty.toFixed(2) + ' <span class="text-xs text-slate-400">unit</span></td>' +
+                    '<td class="px-2 py-3 align-top text-right">' +
+                        '<input type="number" min="0" max="' + qty.toFixed(2) + '" step="0.01" value="' + quotationImportEsc(state.applyQty) + '" placeholder="Apply Qty" ' +
+                        'onchange="setQuotationTransferQty(\'' + key + '\', this.value)" ' +
+                        'class="no-spin w-28 h-8 border-0 border-b border-slate-300 bg-transparent px-2 text-sm text-right focus:outline-none focus:border-indigo-500 placeholder:text-slate-400">' +
+                    '</td>' +
+                '</tr>';
+        }).join('') : '<tr><td colspan="6" class="px-3 py-6 text-center text-sm text-slate-400">This quotation has no item lines to transfer.</td></tr>';
+
+        return '' +
+            '<div class="relative pl-9">' +
+                '<div class="absolute left-2 top-2 text-slate-500">' +
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>' +
+                '</div>' +
+                '<div class="flex items-center justify-between gap-3 mb-2">' +
+                    '<div class="flex items-center gap-3 min-w-0">' +
+                        '<div class="text-sm font-semibold text-slate-800 truncate">' + quotationImportEsc(q.quotation_no || '') + ': ' + quotationImportEsc(q.customer_name || '') + '</div>' +
+                        '<span class="inline-flex items-center h-6 px-2 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">' + quotationImportEsc(q.quotation_date_display || '') + '</span>' +
+                    '</div>' +
+                    '<button type="button" onclick="removeQuotationFromTransfer(\'' + qid + '\')" class="w-7 h-7 flex items-center justify-center rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">' +
+                        '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+                    '</button>' +
+                '</div>' +
+                '<div class="overflow-hidden border border-slate-100 rounded-lg">' +
+                    '<table class="w-full text-sm">' +
+                        '<thead class="bg-slate-50">' +
+                            '<tr class="border-b border-slate-100">' +
+                                '<th class="w-10 px-2 py-3 text-left"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" ' + (quoteSelected ? 'checked' : '') + (quotePartial && !quoteSelected ? ' data-partial="1"' : '') + ' onchange="toggleQuotationTransferQuote(\'' + qid + '\', this.checked)"></th>' +
+                                '<th class="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600">Item</th>' +
+                                '<th class="px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-600">Unit Price</th>' +
+                                '<th class="px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-600">Original Qty</th>' +
+                                '<th class="px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-600">Balance Qty</th>' +
+                                '<th class="px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-600">Apply Qty</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>' +
+                '</div>' +
+            '</div>';
+    }).join('');
+
+    body.innerHTML = quoteHtml;
+    body.querySelectorAll('input[data-partial="1"]').forEach(function(input) {
+        input.indeterminate = true;
+    });
+    if (empty) empty.className = _quotationTransferOrder.length ? 'hidden' : 'h-full min-h-[260px] flex items-center justify-center text-center';
+    if (hint) hint.textContent = selectedCount > 0 ? selectedCount + ' item line' + (selectedCount > 1 ? 's' : '') + ' selected.' : 'Select item lines to transfer.';
+    if (btn) btn.disabled = selectedCount === 0;
+}
+
+function confirmQuotationTransfer() {
+    var importedCount = 0;
+    _quotationTransferOrder.forEach(function(qid) {
+        var q = _quotationTransferQuotes[qid];
+        if (!q) return;
+        quotationTransferNormalItems(q).forEach(function(entry) {
+            var key = quotationTransferKey(qid, entry.idx);
+            var state = _quotationTransferItems[key];
+            if (!state || !state.selected) return;
+            var qty = parseFloat(state.applyQty || 0);
+            if (!isFinite(qty) || qty <= 0) return;
+            var itemCopy = Object.assign({}, entry.item, { quantity: qty });
+            importQuotationItemRow(itemCopy);
+            importedCount++;
+        });
+    });
+    if (importedCount === 0) return;
+    renumberRows();
+    calcAll();
+    closeQuotationTransferModal(true);
+    showToast(importedCount + ' item line' + (importedCount !== 1 ? 's' : '') + ' imported from quotation.', 'success');
 }
 
 function importQuotationItemRow(item) {
@@ -5988,7 +6106,6 @@ function importQuotationItemRow(item) {
     var discRawEl = mainRow.querySelector('.item-disc-raw');
     var taxEl = mainRow.querySelector('.item-tax');
     var noteEl = descRow ? descRow.querySelector('[name*="[item_description]"]') : null;
-    var classEl = descRow ? descRow.querySelector('.item-class') : null;
 
     if (productIdEl) productIdEl.value = item.product_id ? String(item.product_id) : '';
     if (descEl) {
@@ -6012,15 +6129,6 @@ function importQuotationItemRow(item) {
         }
     }
     if (noteEl) noteEl.value = item.item_description || '';
-    if (classEl) classEl.value = item.classification || '';
-    if (descRow) {
-        var lhdnWrap = descRow.querySelector('[x-data]');
-        if (lhdnWrap && lhdnWrap._x_dataStack && lhdnWrap._x_dataStack[0]) {
-            lhdnWrap._x_dataStack[0].value = item.classification || '';
-            lhdnWrap._x_dataStack[0].q = '';
-            lhdnWrap._x_dataStack[0].open = false;
-        }
-    }
 
     calcRow(mainRow);
 }
@@ -6031,23 +6139,18 @@ function confirmQuotationImport() {
     });
     if (selected.length === 0) return;
 
-    var importedCount = 0;
-    selected.forEach(function(q) {
-        (q.items || []).forEach(function(item) {
-            importQuotationItemRow(item);
-            importedCount++;
-        });
-    });
-
-    renumberRows();
-    calcAll();
-    closeQuotationImportModal();
-    showToast(importedCount + ' item line' + (importedCount !== 1 ? 's' : '') + ' imported from quotation.', 'success');
+    addQuotationsToTransfer(selected);
+    var modal = document.getElementById('quotationImportModal');
+    if (modal) modal.style.display = 'none';
+    resetQuotationImportModal();
+    openQuotationTransferModal(true);
 }
 
 function selectImportItemsSource(source) {
     closeImportItemsMenu();
     if (source === 'quotation') {
+        resetQuotationTransferState();
+        renderQuotationTransferModal();
         openQuotationImportModal();
         return;
     }
@@ -6075,7 +6178,13 @@ document.addEventListener('click', function(e) {
 });
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeQuotationImportModal();
+    if (e.key !== 'Escape') return;
+    var transferModal = document.getElementById('quotationTransferModal');
+    if (transferModal && transferModal.style.display !== 'none') {
+        closeQuotationTransferModal(true);
+        return;
+    }
+    closeQuotationImportModal();
 });
 
 (function() {
@@ -6200,7 +6309,7 @@ document.addEventListener('keydown', function(e) {
                 var isC = yr === todayY && !isS;
                 cells += '<button type="button" class="dp-yr-cell' + (isS ? ' dp-yr-sel' : '') + (isC ? ' dp-yr-cur' : '') + (isOut ? ' dp-yr-out' : '') + '"' + (isOut ? '' : ' data-year="' + yr + '"') + '>' + yr + '</button>';
             }
-            popup.innerHTML = '<div class="dp-head"><button type="button" class="dp-nav-btn" data-decade="-1">' + dblL + '</button><span class="dp-title-btn" style="cursor:default">' + decadeStart + '–' + (decadeStart + 9) + '</span><button type="button" class="dp-nav-btn" data-decade="1">' + dblR + '</button></div><div class="dp-year-grid">' + cells + '</div>';
+            popup.innerHTML = '<div class="dp-head"><button type="button" class="dp-nav-btn" data-decade="-1">' + dblL + '</button><span class="dp-title-btn" style="cursor:default">' + decadeStart + '-' + (decadeStart + 9) + '</span><button type="button" class="dp-nav-btn" data-decade="1">' + dblR + '</button></div><div class="dp-year-grid">' + cells + '</div>';
             popup.querySelectorAll('[data-year]').forEach(function(btn) {
                 btn.addEventListener('click', function() { viewing.setFullYear(+btn.dataset.year); view = 'month'; renderMonth(); });
             });
@@ -6269,8 +6378,9 @@ function apReset() {
     document.getElementById('ap_base_unit_label').value = 'unit';
     document.getElementById('ap_sales_tax').value = '';
     document.getElementById('ap_classification_code').value = '';
+    setApSalesTax('', 'None');
 
-    // Reset LHDN Alpine component
+    // Reset the LHDN classification dropdown
     var panel = document.getElementById('apPanel');
     if (panel) {
         panel.querySelectorAll('[x-data]').forEach(function(el) {
@@ -6278,10 +6388,6 @@ function apReset() {
             var d = el._x_dataStack[0];
             if (typeof d.value !== 'undefined' && typeof d.filteredCodes !== 'undefined') {
                 d.value = ''; d.q = ''; d.open = false; d.activeIdx = -1;
-            }
-            // Reset the sales tax dropdown
-            if (typeof d.value !== 'undefined' && typeof d.options !== 'undefined' && !d.filteredCodes) {
-                d.value = ''; d.open = false;
             }
         });
     }
@@ -6295,7 +6401,7 @@ function apReset() {
     if (body) body.scrollTop = 0;
 }
 
-// ── Submit ──
+// -- Submit --
 function submitAddProduct() {
     var name = (document.getElementById('ap_name').value || '').trim();
     if (!name) {
@@ -6309,7 +6415,6 @@ function submitAddProduct() {
     btn.disabled = true; btn.textContent = 'Saving...';
 
     var classCode = document.getElementById('ap_classification_code').value || '';
-    // Read from Alpine if available
     var panel = document.getElementById('apPanel');
     if (panel) {
         panel.querySelectorAll('[x-data]').forEach(function(el) {
@@ -6389,7 +6494,7 @@ function submitAddProduct() {
 
 <?php if (isset($invoiceCustomFields) && !empty($invoiceCustomFields)): ?>
 <script>
-// ── Custom field date pickers — run after all HTML is rendered ────
+// -- Custom field date pickers - run after all HTML is rendered ----
 (function() {
     var ML=['January','February','March','April','May','June','July','August','September','October','November','December'];
     var MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
