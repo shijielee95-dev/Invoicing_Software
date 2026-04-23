@@ -213,13 +213,15 @@ $tables = [
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 'invoice_payments' => "CREATE TABLE IF NOT EXISTS invoice_payments (
-    id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    invoice_id     INT UNSIGNED  NOT NULL,
-    payment_method VARCHAR(5)    NOT NULL DEFAULT '01' COMMENT '01=Cash,02=Cheque,03=Bank Transfer,04=Online Banking,05=Credit/Debit Card,06=Others',
-    amount         DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    reference_no   VARCHAR(100)  DEFAULT '',
-    notes          TEXT,
-    created_at     TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    invoice_id      INT UNSIGNED  NOT NULL,
+    payment_term_id INT UNSIGNED  DEFAULT NULL,
+    amount          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    fee_amount      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    fee_mode        ENUM('fixed','pct') NOT NULL DEFAULT 'fixed',
+    reference_no    VARCHAR(100)  DEFAULT '',
+    notes           TEXT,
+    created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -643,6 +645,33 @@ foreach ($alterInvMovements as $col => $sql) {
     } else {
         $success[] = "Column <strong>inventory_movements.{$col}</strong> — already exists, skipped";
     }
+}
+
+// ── ALTER invoice_payments — add fee_amount ──────────────────
+try {
+    $chk = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='invoice_payments' AND COLUMN_NAME='fee_amount'");
+    $chk->execute();
+    if (!(int)$chk->fetchColumn()) {
+        $pdo->exec("ALTER TABLE invoice_payments ADD COLUMN fee_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER amount");
+        $success[] = "invoice_payments.fee_amount — added";
+    } else {
+        $success[] = "invoice_payments.fee_amount — already exists, skipped";
+    }
+} catch (PDOException $e) {
+    $errors[] = "invoice_payments.fee_amount: " . $e->getMessage();
+}
+
+try {
+    $chk = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='invoice_payments' AND COLUMN_NAME='fee_mode'");
+    $chk->execute();
+    if (!(int)$chk->fetchColumn()) {
+        $pdo->exec("ALTER TABLE invoice_payments ADD COLUMN fee_mode ENUM('fixed','pct') NOT NULL DEFAULT 'fixed' AFTER fee_amount");
+        $success[] = "invoice_payments.fee_mode — added";
+    } else {
+        $success[] = "invoice_payments.fee_mode — already exists, skipped";
+    }
+} catch (PDOException $e) {
+    $errors[] = "invoice_payments.fee_mode: " . $e->getMessage();
 }
 
 // Drop payment_method — replaced by payment_term_id

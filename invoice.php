@@ -1532,9 +1532,10 @@ var _customerPaymentTermName = '';
                 </div>
                 <div>
                     <label class="<?= t('label') ?>" x-text="selected.code === baseCurrency ? 'Rate *' : (selected.code + ' 1 = ' + baseCurrency + ' *')"></label>
-                    <input type="number" name="rate" x-model="rate" step="0.00001"
+                    <input type="number" id="exchangeRate" name="rate" x-model="rate" step="0.00001"
                            :disabled="selected.code === baseCurrency"
                            :class="selected.code === baseCurrency ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''"
+                           @input="$nextTick(() => { if(typeof updateTotals === 'function') updateTotals(); })"
                            class="<?= t('input') ?>">
                 </div>
             </div>
@@ -1906,11 +1907,20 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                     <span id="dispRounding">0.00</span>
                 </div>
             </div>
-            <div class="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 text-base">
-                <span>TOTAL</span>
-                <div class="flex justify-between w-32">
-                    <span class="currency-label">RM</span>
-                    <span id="dispTotal">0.00</span>
+            <div class="border-t border-slate-200 pt-3 grid grid-cols-[1fr_auto] font-bold text-base">
+                <div class="flex items-start pt-0.5">
+                    <span>TOTAL</span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between w-32  text-slate-900">
+                        <span class="currency-label">RM</span>
+                        <span id="dispTotal">0.00</span>
+                    </div>
+                    <!-- Home Currency Conversion -->
+                    <div id="homeConversionWrap" style="display:none" class="flex justify-between w-32  text-slate-600">
+                        <span class="home-currency-label">RM</span>
+                        <span id="dispHomeTotal">0.00</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1966,7 +1976,8 @@ $paymentMethodLabels = [
             <colgroup>
                 <col style="width:44px">    <!-- # -->
                 <col style="width:190px">   <!-- Payment Method -->
-                <col style="width:120px">   <!-- Amount -->
+                <col style="width:140px">   <!-- Amount -->
+                <col style="width:110px">   <!-- Fee Amount -->
                 <col>                        <!-- Reference No. (flex) -->
                 <col>                        <!-- Notes (flex, same as Ref) -->
                 <col style="width:44px">    <!-- delete -->
@@ -1976,6 +1987,7 @@ $paymentMethodLabels = [
                     <th class="px-3 py-2.5 text-center text-[10px] font-semibold text-slate-700 uppercase tracking-wide">#</th>
                     <th class="px-3 py-2.5 text-left   text-[10px] font-semibold text-slate-700 uppercase tracking-wide">Payment Term</th>
                     <th class="px-2 py-2.5 text-right  text-[10px] font-semibold text-slate-700 uppercase tracking-wide">Amount</th>
+                    <th class="px-2 py-2.5 text-right  text-[10px] font-semibold text-slate-700 uppercase tracking-wide">Fee Amount</th>
                     <th class="px-2 py-2.5 text-left   text-[10px] font-semibold text-slate-700 uppercase tracking-wide">Reference No.</th>
                     <th class="px-2 py-2.5 text-left   text-[10px] font-semibold text-slate-700 uppercase tracking-wide">Notes</th>
                     <th class="px-2 py-2.5"></th>
@@ -2011,11 +2023,20 @@ $paymentMethodLabels = [
                         </div>
                     </td>
                     <td class="px-2 py-2">
-                        <input type="number" name="payments[<?= $pi ?>][amount]" value="<?= number_format((float)$pmt['amount'], 2, '.', '') ?>"
-                               min="0" step="0.01" placeholder="0.00"
-                               class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition pmt-amount"
+                        <input type="text" name="payments[<?= $pi ?>][amount]" value="<?= e(fmtComma($pmt['amount'], 2)) ?>"
+                               placeholder="0.00"
+                               class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition pmt-amount"
+                               onfocus="stripComma(this)"
                                oninput="updatePaymentTotal()"
-                               onblur="this.value=parseFloat(this.value||0).toFixed(2)">
+                               onblur="this.value=fmtComma(this.value, 2); updatePaymentTotal()">
+                               </td>                    <td class="px-2 py-2">
+                        <input type="text" name="payments[<?= $pi ?>][fee_raw]" value="<?= e(fmtDiscOnLoad($pmt['fee_amount'] ?? 0, $pmt['fee_mode'] ?? 'fixed')) ?>"
+                               placeholder="0.00 or %"
+                               class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-fee-raw"
+                               onfocus="stripComma(this)"
+                               onblur="formatFee(this)">
+                        <input type="hidden" name="payments[<?= $pi ?>][fee_amount]" class="pmt-fee-val"  value="<?= e($pmt['fee_amount'] ?? 0) ?>">
+                        <input type="hidden" name="payments[<?= $pi ?>][fee_mode]"   class="pmt-fee-mode" value="<?= e($pmt['fee_mode'] ?? 'fixed') ?>">
                     </td>
                     <td class="px-2 py-2">
                         <input type="text" name="payments[<?= $pi ?>][reference_no]" value="<?= e($pmt['reference_no'] ?? '') ?>"
@@ -2201,8 +2222,18 @@ $paymentMethodLabels = [
 
 <!-- Sticky footer -->
 <div class="fixed bottom-0 right-0 bg-white border-t border-slate-200 z-20 flex items-center justify-between px-8 py-3" style="left:256px">
-    <div class="text-sm text-slate-500">
-        Total: <span class="font-bold text-slate-900 text-base ml-1"><span class="currency-label">RM</span> <span id="footerTotal">0.00</span></span>
+    <div class="flex items-start gap-3">
+        <span class="text-sm text-slate-500 mt-0.5">Total:</span>
+        <div class="flex flex-col gap-0.5">
+            <div class="font-bold text-slate-900 text-base">
+                <span class="currency-label">RM</span>
+                <span id="footerTotal">0.00</span>
+            </div>
+            <div id="homeConversionWrapSticky" style="display:none" class="font-bold text-slate-600 text-base">
+                <span class="home-currency-label">RM</span>
+                <span id="dispHomeTotalSticky">0.00</span>
+            </div>
+        </div>
     </div>
     <div class="flex items-center gap-3">
         <label class="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
@@ -2587,10 +2618,30 @@ function updateTotals() {
     var taxByType = {}; // { typeId: { label: 'SST (6%)', amount: 0 } }
     var sectionTotal = 0, sectionQty = 0, sectionDisc = 0, sectionTax = 0;
 
-    // Get current currency
-    var currInput = document.getElementById('selectedCurrency');
-    var currency  = currInput ? currInput.value : 'RM';
-    var label     = currency === 'MYR' ? 'RM' : currency;
+    // -- Currency & Rate Retrieval (Prioritize Alpine) --
+    var currEl     = document.getElementById('invoiceCurrencyDd');
+    var wrap       = currEl ? currEl.closest('[x-data]') : null;
+    var alpineData = null;
+    if (wrap) {
+        alpineData = wrap.__x ? wrap.__x.$data : (wrap._x_dataStack ? wrap._x_dataStack[0] : null);
+    }
+
+    var currency   = 'MYR';
+    var rate       = 1.0;
+    var isFetching = false;
+
+    if (alpineData) {
+        currency   = alpineData.selected ? alpineData.selected.code : 'MYR';
+        rate       = typeof alpineData.rate !== 'undefined' ? parseFloat(alpineData.rate) || 1.0 : 1.0;
+        isFetching = !!alpineData.isFetching;
+    } else {
+        var currInput = document.getElementById('selectedCurrency');
+        if (currInput) currency = currInput.value || 'MYR';
+        var rateEl = document.getElementById('exchangeRate');
+        if (rateEl) rate = parseFloat(rateEl.value) || 1.0;
+    }
+    
+    var label = (currency === 'MYR' || currency === 'RM') ? 'RM' : currency;
 
     document.querySelectorAll('.currency-label').forEach(function(el) {
         el.textContent = label;
@@ -2699,6 +2750,42 @@ function updateTotals() {
     document.getElementById('hiddenDiscount').value  = totalDisc.toFixed(2);
     document.getElementById('hiddenTotal').value     = total.toFixed(2);
     document.getElementById('hiddenRounding').value  = rounding.toFixed(2);
+
+    // -- Home Currency Conversion --
+    var homeCurrency = '<?= e($baseCurrency) ?>'.trim().toUpperCase();
+    var rate = 1.0;
+    if (alpineData && typeof alpineData.rate !== 'undefined') {
+        rate = parseFloat(alpineData.rate) || 1.0;
+    } else {
+        var rateEl = document.getElementById('exchangeRate');
+        if (rateEl) rate = parseFloat(rateEl.value) || 1.0;
+    }
+    
+    var wrapConv       = document.getElementById('homeConversionWrap');
+    var wrapConvSticky = document.getElementById('homeConversionWrapSticky');
+    var dispHome       = document.getElementById('dispHomeTotal');
+    var dispHomeSticky = document.getElementById('dispHomeTotalSticky');
+
+    if (wrapConv) {
+        var curClean = currency.trim().toUpperCase();
+        if (!isFetching && curClean !== homeCurrency && curClean !== '' && curClean !== 'RM') {
+            var homeTotal = total * rate;
+            var homeLabel = homeCurrency === 'MYR' ? 'RM' : homeCurrency;
+            
+            if (dispHome)       dispHome.textContent       = fmtComma(homeTotal, 2);
+            if (dispHomeSticky) dispHomeSticky.textContent = fmtComma(homeTotal, 2);
+            
+            document.querySelectorAll('.home-currency-label').forEach(function(el) {
+                el.textContent = homeLabel;
+            });
+            
+            wrapConv.style.display = 'flex';
+            if (wrapConvSticky) wrapConvSticky.style.display = 'block';
+        } else {
+            wrapConv.style.display = 'none';
+            if (wrapConvSticky) wrapConvSticky.style.display = 'none';
+        }
+    }
 
     // Keep first payment row amount in sync when only one row exists
     // Skip on initial page load (edit mode preserves saved payment amounts)
@@ -3553,9 +3640,10 @@ function customerSearch() {
             // -- Auto-set currency from customer default --
             if (c.currency) {
                 var currEl = document.getElementById('invoiceCurrencyDd');
-                if (currEl && currEl._x_dataStack && currEl._x_dataStack[0]) {
+                var wrap   = currEl ? currEl.closest('[x-data]') : null;
+                if (wrap && wrap._x_dataStack && wrap._x_dataStack[0]) {
                     var curr = INVOICE_CURRENCIES.find(function(x){ return x.code === c.currency; });
-                    if (curr) currEl._x_dataStack[0].pick(curr);
+                    if (curr) wrap._x_dataStack[0].pick(curr);
                 }
             }
 
@@ -3632,9 +3720,10 @@ function customerSearch() {
 
             // Reset currency dropdown to MYR
             var currEl = document.getElementById('invoiceCurrencyDd');
-            if (currEl && currEl._x_dataStack && currEl._x_dataStack[0]) {
+            var wrap   = currEl ? currEl.closest('[x-data]') : null;
+            if (wrap && wrap._x_dataStack && wrap._x_dataStack[0]) {
                 var myr = INVOICE_CURRENCIES.find(function(x){ return x.code === 'MYR'; });
-                if (myr) currEl._x_dataStack[0].pick(myr);
+                if (myr) wrap._x_dataStack[0].pick(myr);
             }
 
             // Focus and reopen dropdown immediately
@@ -3831,6 +3920,7 @@ function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
         selected:  { code: def.code, label: def.code + ' \u2014 ' + def.name },
         baseCurrency: baseCurrency,
         rate:      enforcedRate,
+        isFetching: false,
         currencies: sorted,
         init: function() {
             var self = this;
@@ -3864,10 +3954,14 @@ function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
             // If same with base currency, lock rate to 1
             if (c.code === this.baseCurrency) {
                 this.rate = 1.0;
+                this.isFetching = false;
                 this.$nextTick(function() {
                     if (typeof updateTotals === 'function') updateTotals();
                 });
             } else {
+                this.isFetching = true;
+                // Update totals immediately to hide home currency row while fetching
+                if (typeof updateTotals === 'function') updateTotals();
                 this.fetchRate(c.code);
             }
 
@@ -3891,11 +3985,18 @@ function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
                 .then(function(data) {
                     if (data && data[fromLower] && data[fromLower][toLower]) {
                         self.rate = data[fromLower][toLower];
-                        if (typeof updateTotals === 'function') updateTotals();
+                        self.isFetching = false;
+                        self.$nextTick(function() {
+                            if (typeof updateTotals === 'function') updateTotals();
+                        });
                     }
                 })
                 .catch(function(err) {
+                    self.isFetching = false;
                     console.error('Exchange rate fetch failed:', err);
+                    self.$nextTick(function() {
+                        if (typeof updateTotals === 'function') updateTotals();
+                    });
                 });
         },
         pickActive: function() {
@@ -4132,9 +4233,16 @@ function addPaymentRow() {
             '</div>'+
         '</td>'+
         '<td class="px-2 py-2">'+
-            '<input type="number" name="payments['+i+'][amount]" value="'+suggestedAmt+'" min="0" step="0.01" placeholder="0.00" '+
-            'class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition pmt-amount" '+
-            'oninput="updatePaymentTotal()" onblur="this.value=parseFloat(this.value||0).toFixed(2)">'+
+            '<input type="text" name="payments['+i+'][amount]" value="'+fmtComma(suggestedAmt, 2)+'" placeholder="0.00" '+
+            'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition pmt-amount" '+
+            'onfocus="stripComma(this)" oninput="updatePaymentTotal()" onblur="this.value=fmtComma(this.value, 2); updatePaymentTotal()">'+
+        '</td>'+
+        '<td class="px-2 py-2">'+
+            '<input type="text" name="payments['+i+'][fee_raw]" value="" placeholder="0.00 or %" '+
+            'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-fee-raw" '+
+            'onfocus="stripComma(this)" onblur="formatFee(this)">'+
+            '<input type="hidden" name="payments['+i+'][fee_amount]" class="pmt-fee-val" value="0">'+
+            '<input type="hidden" name="payments['+i+'][fee_mode]"   class="pmt-fee-mode" value="fixed">'+
         '</td>'+
         '<td class="px-2 py-2">'+
             '<input type="text" name="payments['+i+'][reference_no]" placeholder="Ref. no." '+
@@ -4178,37 +4286,57 @@ function renumberPaymentRows() {
     });
 }
 
+// "20.00%" -> pct mode, "20.00" -> fixed mode. Always 2dp.
+function formatFee(input) {
+    var raw   = input.value.trim().replace(/,/g, '');
+    var isPct = raw.endsWith('%');
+    var num   = parseFloat(raw.replace('%','')) || 0;
+
+    input.value = isPct ? num.toFixed(2)+'%' : fmtComma(num, 2);
+
+    var row = input.closest('tr');
+    if (!row) return;
+    var dEl = row.querySelector('.pmt-fee-val');
+    var mEl = row.querySelector('.pmt-fee-mode');
+    if (dEl) dEl.value = num;
+    if (mEl) mEl.value = isPct ? 'pct' : 'fixed';
+}
+
 function updatePaymentTotal() {
     var invoiceTotal = parseFloat(document.getElementById('hiddenTotal').value) || 0;
     var inputs = document.querySelectorAll('#paymentsBody .pmt-amount');
     var runningTotal = 0;
 
     inputs.forEach(function(inp) {
-        var val = parseFloat(inp.value) || 0;
+        var raw = String(inp.value).replace(/,/g, '');
+        var val = parseFloat(raw) || 0;
 
-        // Clamp: this row cannot be negative
-        if (val < 0) { val = 0; inp.value = '0.00'; }
+        var clamped = val;
+        if (clamped < 0) clamped = 0;
 
         // Clamp: this row cannot push the running total past invoice total
         var maxAllowed = Math.max(0, invoiceTotal - runningTotal);
-        if (val > maxAllowed) {
-            val = maxAllowed;
-            inp.value = val.toFixed(2);
+        if (clamped > maxAllowed) {
+            clamped = maxAllowed;
         }
 
-        runningTotal += val;
+        if (document.activeElement !== inp) {
+            inp.value = fmtComma(clamped, 2);
+        }
+
+        runningTotal += clamped;
     });
 
     var balance = invoiceTotal - runningTotal;
-    document.getElementById('pmtPaidTotal').textContent = runningTotal.toFixed(2);
+    document.getElementById('pmtPaidTotal').textContent = fmtComma(runningTotal, 2);
     var balEl    = document.getElementById('pmtBalance');
     var balLabel = document.getElementById('pmtBalanceLabel');
     if (balance < 0.005) {
         balLabel.className = 'font-semibold ml-1 text-green-600'; // fully paid
-        balEl.textContent  = (0).toFixed(2);
+        balEl.textContent  = fmtComma(0, 2);
     } else {
         balLabel.className = 'font-semibold ml-1 text-slate-800'; // balance remaining
-        balEl.textContent  = balance.toFixed(2);
+        balEl.textContent  = fmtComma(balance, 2);
     }
 }
 
@@ -4221,7 +4349,7 @@ function syncFirstPaymentRowAmount() {
     var amtInp = rows[0].querySelector('.pmt-amount');
     if (!amtInp) return;
     var invoiceTotal = parseFloat(document.getElementById('hiddenTotal').value) || 0;
-    amtInp.value = invoiceTotal.toFixed(2);
+    amtInp.value = fmtComma(invoiceTotal, 2);
     updatePaymentTotal();
 }
 

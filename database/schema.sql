@@ -283,3 +283,20 @@ CREATE TABLE IF NOT EXISTS inventory_adjustments (
     INDEX idx_adj_product (product_id),
     INDEX idx_adj_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ─────────────────────────────────────────────
+-- INVOICE PAYMENTS
+-- ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    invoice_id      INT UNSIGNED  NOT NULL,
+    payment_term_id INT UNSIGNED  DEFAULT NULL,
+    amount          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    fee_amount      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    fee_mode        ENUM('fixed','pct') NOT NULL DEFAULT 'fixed',
+    reference_no    VARCHAR(100)  DEFAULT '',
+    notes           TEXT,
+    created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

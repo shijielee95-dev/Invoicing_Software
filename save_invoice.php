@@ -83,9 +83,13 @@ function normaliseItem(array $it): array {
     ];
 }
 function normalisePayment(array $p): array {
+    $amt = str_replace(',', '', (string)($p['amount'] ?? 0));
+    $fee = str_replace(',', '', (string)($p['fee_amount'] ?? 0));
     return [
         'term_name'    => (string)($p['term_name'] ?? ''),
-        'amount'       => round((float)($p['amount'] ?? 0), 2),
+        'amount'       => round((float)$amt, 2),
+        'fee_amount'   => round((float)$fee, 2),
+        'fee_mode'     => (string)($p['fee_mode'] ?? 'fixed'),
         'reference_no' => (string)($p['reference_no'] ?? ''),
         'notes'        => (string)($p['notes'] ?? ''),
     ];
@@ -413,8 +417,14 @@ try {
         // Build new payments snapshot for audit
         $newPaymentsAudit = [];
         foreach ($paymentsPost as $pmt) {
-            $pmtAmt = round((float)($pmt['amount'] ?? 0), 2);
+            $pmtAmtRaw = str_replace(',', '', (string)($pmt['amount'] ?? 0));
+            $pmtAmt    = round((float)$pmtAmtRaw, 2);
             if ($pmtAmt <= 0) continue;
+
+            $pmtFeeRaw = str_replace(',', '', (string)($pmt['fee_amount'] ?? 0));
+            $pmtFee    = round((float)$pmtFeeRaw, 2);
+            $pmtMode   = in_array($pmt['fee_mode'] ?? '', ['fixed', 'pct']) ? $pmt['fee_mode'] : 'fixed';
+
             $pmtTermId = (int)($pmt['payment_term_id'] ?? 0) ?: null;
             $termName  = '';
             if ($pmtTermId) {
@@ -427,6 +437,8 @@ try {
             $newPaymentsAudit[] = [
                 'term_name'    => $termName,
                 'amount'       => $pmtAmt,
+                'fee_amount'   => $pmtFee,
+                'fee_mode'     => $pmtMode,
                 'reference_no' => trim($pmt['reference_no'] ?? ''),
                 'notes'        => trim($pmt['notes'] ?? ''),
             ];
@@ -715,14 +727,18 @@ try {
     // Delete existing payments for this invoice then re-insert
     $pdo->prepare("DELETE FROM invoice_payments WHERE invoice_id=?")->execute([$invoiceId]);
 
-    $pmtStmt = $pdo->prepare("INSERT INTO invoice_payments (invoice_id, payment_term_id, amount, reference_no, notes) VALUES (?,?,?,?,?)");
+    $pmtStmt = $pdo->prepare("INSERT INTO invoice_payments (invoice_id, payment_term_id, amount, fee_amount, fee_mode, reference_no, notes) VALUES (?,?,?,?,?,?,?)");
     foreach ($_POST['payments'] ?? [] as $pmt) {
         $pmtTermId = (int)($pmt['payment_term_id'] ?? 0) ?: null;
-        $pmtAmt    = round((float)($pmt['amount'] ?? 0), 2);
+        $pmtAmtRaw = str_replace(',', '', (string)($pmt['amount'] ?? 0));
+        $pmtFeeRaw = str_replace(',', '', (string)($pmt['fee_amount'] ?? 0));
+        $pmtAmt    = round((float)$pmtAmtRaw, 2);
+        $pmtFee    = round((float)$pmtFeeRaw, 2);
+        $pmtMode   = in_array($pmt['fee_mode'] ?? '', ['fixed', 'pct']) ? $pmt['fee_mode'] : 'fixed';
         $pmtRef    = trim($pmt['reference_no'] ?? '');
         $pmtNotes  = trim($pmt['notes'] ?? '');
         if ($pmtAmt <= 0) continue; // skip zero-amount rows
-        $pmtStmt->execute([$invoiceId, $pmtTermId, $pmtAmt, $pmtRef, $pmtNotes]);
+        $pmtStmt->execute([$invoiceId, $pmtTermId, $pmtAmt, $pmtFee, $pmtMode, $pmtRef, $pmtNotes]);
     }
 
     // ── Delete marked attachments ────────────────

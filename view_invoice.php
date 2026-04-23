@@ -442,6 +442,8 @@ document.getElementById('pageActions').innerHTML = `
                     <col>                       <!-- Payment Term (flex) -->
                     <col style="width:40px">   <!-- sym -->
                     <col style="width:110px">  <!-- Amount (fixed) -->
+                    <col style="width:40px">   <!-- sym -->
+                    <col style="width:110px">  <!-- Fee Amount (fixed) -->
                     <col>                       <!-- Reference (flex, shares with term/notes) -->
                     <col>                       <!-- Notes (flex, shares with term/notes) -->
                 </colgroup>
@@ -450,6 +452,7 @@ document.getElementById('pageActions').innerHTML = `
                         <th class="text-left pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">#</th>
                         <th class="text-left pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Payment Term</th>
                         <th colspan="2" class="text-center pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide pr-4">Amount</th>
+                        <th colspan="2" class="text-center pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide pr-4">Fee Amount</th>
                         <th class="text-left pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide pl-4">Reference</th>
                         <th class="text-left pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Notes</th>
                     </tr>
@@ -461,6 +464,16 @@ document.getElementById('pageActions').innerHTML = `
                         <td class="py-2.5 text-slate-800"><?= e($pmt['term_name'] ?: '—') ?></td>
                         <td class="py-2.5 text-right text-slate-400 text-xs whitespace-nowrap"><?= $sym ?></td>
                         <td class="py-2.5 text-right font-medium text-slate-800 pr-4"><?= number_format((float)$pmt['amount'], 2) ?></td>
+                        <td class="py-2.5 text-right text-slate-400 text-xs whitespace-nowrap"><?= $sym ?></td>
+                        <td class="py-2.5 text-right font-medium text-slate-800 pr-4">
+                            <?php 
+                            $pAmt  = (float)($pmt['amount'] ?? 0);
+                            $fVal  = (float)($pmt['fee_amount'] ?? 0);
+                            $fMode = $pmt['fee_mode'] ?? 'fixed';
+                            $calculatedFee = ($fMode === 'pct') ? ($pAmt * ($fVal / 100)) : $fVal;
+                            echo number_format($calculatedFee, 2);
+                            ?>
+                        </td>
                         <td class="py-2.5 text-slate-800 text-xs pl-4"><?= e($pmt['reference_no'] ?: '—') ?></td>
                         <td class="py-2.5 text-slate-800 text-xs"><?= e($pmt['notes'] ?: '—') ?></td>
                     </tr>
@@ -471,7 +484,7 @@ document.getElementById('pageActions').innerHTML = `
                         <td colspan="2" class="py-2.5 text-xs font-semibold text-slate-800">Total Paid</td>
                         <td class="py-2.5 text-right text-slate-400 text-xs whitespace-nowrap"><?= $sym ?></td>
                         <td class="py-2.5 text-right font-bold text-slate-900 pr-4"><?= number_format($paidTotal, 2) ?></td>
-                        <td colspan="2"></td>
+                        <td colspan="4"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -1083,6 +1096,7 @@ function showHistory(data, action, userName, dateStr) {
         html += '<div class="p-5"><table class="w-full text-sm border border-slate-100 rounded-lg overflow-hidden"><thead class="bg-slate-50"><tr>' +
             '<th class="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase">Term</th>' +
             '<th class="px-3 py-2 text-right text-[10px] font-semibold text-slate-500 uppercase">Amount</th>' +
+            '<th class="px-3 py-2 text-right text-[10px] font-semibold text-slate-500 uppercase">Fee Amount</th>' +
             '<th class="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase">Reference</th>' +
             '<th class="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase">Notes</th></tr></thead><tbody>';
         // Show removed rows (genuinely removed, count decreased)
@@ -1091,6 +1105,7 @@ function showHistory(data, action, userName, dateStr) {
                 html += '<tr class="bg-red-50 border-b border-red-100">' +
                     '<td class="px-3 py-2 text-red-500 line-through">'+esc(p.term_name||'—')+'</td>' +
                     '<td class="px-3 py-2 text-right text-red-400 line-through">'+fmtN(p.amount)+'</td>' +
+                    '<td class="px-3 py-2 text-right text-red-400 line-through">'+fmtN(p.fee_amount)+'</td>' +
                     '<td class="px-3 py-2 text-red-400 line-through">'+esc(p.reference_no||'—')+'</td>' +
                     '<td class="px-3 py-2 text-red-400 line-through">'+esc(p.notes||'—')+'</td></tr>';
             });
@@ -1099,18 +1114,23 @@ function showHistory(data, action, userName, dateStr) {
         var srcPayments = payments.length ? payments : oldPayments;
         srcPayments.forEach(function(p, i) {
             var m = isUpdate ? (oldPayments[i] || null) : null;
-            var changed = m && (m.term_name !== p.term_name || fmtN(m.amount) !== fmtN(p.amount));
+            var changed = m && (m.term_name !== p.term_name || fmtN(m.amount) !== fmtN(p.amount) || fmtN(m.fee_amount) !== fmtN(p.fee_amount) || m.fee_mode !== p.fee_mode);
             var added   = isUpdate && !m;
             var rowCls  = added ? 'bg-emerald-50 ' : (changed ? 'bg-amber-50 ' : '');
             var tc      = added ? 'text-emerald-700 font-medium' : (changed ? 'text-amber-700' : 'text-slate-600');
             var ac      = added ? 'text-emerald-600 font-medium' : (changed ? 'text-amber-700' : 'text-slate-800');
             html += '<tr class="'+rowCls+'border-b border-slate-100">';
             if (changed) {
+                var mFeeStr = m.fee_amount > 0 ? (m.fee_mode==='pct'?fmtN(m.fee_amount)+'%':fmtN(m.fee_amount)) : '—';
+                var pFeeStr = p.fee_amount > 0 ? (p.fee_mode==='pct'?fmtN(p.fee_amount)+'%':fmtN(p.fee_amount)) : '—';
                 html += '<td class="px-3 py-2"><div class="line-through text-red-400 text-xs">'+esc(m.term_name||'—')+'</div><div class="'+tc+'">'+esc(p.term_name||'—')+'</div></td>';
                 html += '<td class="px-3 py-2 text-right"><div class="line-through text-red-400 text-xs">'+fmtN(m.amount)+'</div><div class="'+ac+'">'+fmtN(p.amount)+'</div></td>';
+                html += '<td class="px-3 py-2 text-right"><div class="line-through text-red-400 text-xs">'+mFeeStr+'</div><div class="'+ac+'">'+pFeeStr+'</div></td>';
             } else {
+                var feeStr = p.fee_amount > 0 ? (p.fee_mode==='pct'?fmtN(p.fee_amount)+'%':fmtN(p.fee_amount)) : '—';
                 html += '<td class="px-3 py-2 '+tc+'">'+esc(p.term_name||'—')+'</td>';
                 html += '<td class="px-3 py-2 text-right '+ac+'">'+fmtN(p.amount)+'</td>';
+                html += '<td class="px-3 py-2 text-right '+ac+'">'+feeStr+'</td>';
             }
             html += '<td class="px-3 py-2 text-slate-400">'+esc(p.reference_no||'—')+'</td>';
             html += '<td class="px-3 py-2 text-slate-400">'+esc(p.notes||'—')+'</td>';
