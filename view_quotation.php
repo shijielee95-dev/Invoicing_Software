@@ -258,32 +258,47 @@ document.getElementById('pageActions').innerHTML = `
 
             <!-- Totals -->
             <div class="flex justify-end">
-                <div class="w-64 space-y-1.5 text-sm">
+                <div class="w-80 space-y-1.5 text-sm">
                     <div class="flex justify-between text-slate-600">
                         <span>Subtotal</span>
-                        <span><?= rm((float)$inv['subtotal']) ?></span>
+                        <div class="flex justify-between w-32">
+                            <span class="text-slate-400 text-xs">RM</span>
+                            <span><?= number_format((float)$inv['subtotal'], 2) ?></span>
+                        </div>
                     </div>
                     <?php if ((float)$inv['discount_amount'] > 0): ?>
                     <div class="flex justify-between text-slate-600">
                         <span>Discount</span>
-                        <span class="text-red-500">− <?= rm((float)$inv['discount_amount']) ?></span>
+                        <div class="flex justify-between w-32">
+                            <span class="text-slate-400 text-xs">RM</span>
+                            <span class="text-red-500">− <?= number_format((float)$inv['discount_amount'], 2) ?></span>
+                        </div>
                     </div>
                     <?php endif; ?>
                     <?php if ((float)$inv['tax_amount'] > 0): ?>
                     <div class="flex justify-between text-slate-600">
                         <span>Tax <?= $inv['tax_mode'] === 'inclusive' ? '(incl.)' : '' ?></span>
-                        <span><?= rm((float)$inv['tax_amount']) ?></span>
+                        <div class="flex justify-between w-32">
+                            <span class="text-slate-400 text-xs">RM</span>
+                            <span><?= number_format((float)$inv['tax_amount'], 2) ?></span>
+                        </div>
                     </div>
                     <?php endif; ?>
                     <?php if ((float)$inv['rounding_adjustment'] != 0): ?>
                     <div class="flex justify-between text-slate-600">
                         <span>Rounding</span>
-                        <span><?= rm((float)$inv['rounding_adjustment']) ?></span>
+                        <div class="flex justify-between w-32">
+                            <span class="text-slate-400 text-xs">RM</span>
+                            <span><?= number_format((float)$inv['rounding_adjustment'], 2) ?></span>
+                        </div>
                     </div>
                     <?php endif; ?>
                     <div class="flex justify-between font-bold text-slate-900 text-base border-t border-slate-200 pt-2 mt-2">
                         <span>Total</span>
-                        <span><?= rm((float)$inv['total_amount']) ?></span>
+                        <div class="flex justify-between w-32">
+                            <span class="text-slate-500 text-xs font-normal">RM</span>
+                            <span><?= number_format((float)$inv['total_amount'], 2) ?></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -349,7 +364,12 @@ document.getElementById('pageActions').innerHTML = `
                 <tfoot>
                     <tr class="border-t border-slate-200">
                         <td colspan="2" class="py-2.5 text-xs font-semibold text-slate-600">Total Paid</td>
-                        <td class="py-2.5 text-right font-bold text-slate-900"><?= rm($paidTotal) ?></td>
+                        <td class="py-2.5">
+                            <div class="flex justify-between font-bold text-slate-900">
+                                <span class="text-slate-400 text-xs font-normal">RM</span>
+                                <span><?= number_format($paidTotal, 2) ?></span>
+                            </div>
+                        </td>
                         <td colspan="2"></td>
                     </tr>
                 </tfoot>
@@ -755,9 +775,9 @@ function showHistory(data, action, userName, dateStr) {
 
         // Totals
         var tf = [['Sub Total','subtotal'],['Discount (−)','discount'],['Tax (+)','tax'],['Rounding Adjustment','rounding'],['TOTAL','total_amount']];
-        html += '<div class="flex justify-end mt-4"><table class="text-sm" style="width:320px">';
+        html += '<div class="flex justify-end mt-4"><table class="text-sm" style="width:360px">';
         if (isUpdate) {
-            html += '<thead><tr class="border-b border-slate-200"><th class="text-left pb-1.5 text-xs font-semibold text-slate-500"></th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-24">Before</th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-24">After</th></tr></thead>';
+            html += '<thead><tr class="border-b border-slate-200"><th class="text-left pb-1.5 text-xs font-semibold text-slate-500"></th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-32">Before</th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-32">After</th></tr></thead>';
         }
         html += '<tbody>';
         tf.forEach(function(f) {
@@ -765,8 +785,8 @@ function showHistory(data, action, userName, dateStr) {
             var isT = f[1]==='total_amount', ch = isUpdate && ov.toFixed(2)!==nv.toFixed(2);
             var bg = isT ? 'bg-amber-50' : (ch ? 'bg-amber-50/50' : '');
             html += '<tr class="border-b border-slate-100 '+bg+'"><td class="py-1.5 px-2 text-slate-600 '+(isT?'font-bold':'')+'">'+f[0]+'</td>';
-            if (isUpdate) html += '<td class="py-1.5 px-2 text-right '+(ch?'text-red-400':'text-slate-400')+'">'+fmtN(ov)+'</td>';
-            html += '<td class="py-1.5 px-2 text-right '+(isT?'font-bold text-slate-900':'text-slate-700 font-medium')+'">'+fmtN(nv)+'</td></tr>';
+            if (isUpdate) html += '<td class="py-1.5 px-2 '+(ch?'text-red-400':'text-slate-400')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(ov)+'</span></div></td>';
+            html += '<td class="py-1.5 px-2 '+(isT?'font-bold text-slate-900':'text-slate-700 font-medium')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(nv)+'</span></div></td></tr>';
         });
         html += '</tbody></table></div>';
         html += '</div></div></div>';

@@ -8,6 +8,23 @@ include 'includes/dropdown.php';
 $pdo    = db();
 $company = $pdo->query("SELECT currency FROM company_profiles WHERE id = 1")->fetch();
 $baseCurrency = $company['currency'] ?? 'MYR';
+
+// -- Numeric formatting helpers for PHP --
+function fmtQty($v) {
+    $n = (float)$v;
+    if ($n == (int)$n) return (string)(int)$n;
+    return rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+}
+function fmtComma($v, $dp = 2) {
+    return number_format((float)$v, $dp, '.', ',');
+}
+function fmtDiscOnLoad($val, $mode) {
+    $n = (float)$val;
+    if ($n == 0) return '';
+    if ($mode === 'pct') return number_format($n, 2, '.', '') . '%';
+    return fmtComma($n, 2);
+}
+
 $action = $_GET['action'] ?? 'list';  // list | new | edit
 $invoiceCustomFields = []; // default - populated in form branch
 
@@ -1470,10 +1487,10 @@ var _customerPaymentTermName = '';
                     <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4" x-data="invoiceCurrencyComp('<?= e($editMode ? $inv['currency'] : $baseCurrency) ?>', '<?= e($baseCurrency) ?>', <?= $editMode ? (float)$inv['rate'] : 1.0 ?>)">
                 <div>
                     <label class="<?= t('label') ?>">Currency <span class="text-red-400">*</span></label>
-                    <div id="invoiceCurrencyDd" x-data="invoiceCurrencyComp('<?= e($editMode ? $inv['currency'] : $baseCurrency) ?>', '<?= e($baseCurrency) ?>', <?= $editMode ? (float)$inv['rate'] : 1.0 ?>)" class="relative">
+                    <div id="invoiceCurrencyDd" class="relative">
                         <!-- Trigger -->
                         <div class="relative">
                             <input type="text" id="invoiceCurrencyInput"
@@ -1505,17 +1522,16 @@ var _customerPaymentTermName = '';
                                                 class="w-full text-left px-3 py-1.5 text-sm transition-colors"
                                                 :class="i===activeIdx ? 'bg-indigo-50 text-indigo-700 font-medium' : (c.code===selected.code ? 'bg-slate-50 text-slate-700 font-medium' : 'text-slate-800 hover:bg-slate-50')">
                                             <span class="font-mono text-xs font-semibold" x-text="c.code"></span>
-                                            <span class="ml-2 text-slate-500" x-text="c.name"></span>
-                                        </button>
-                                    </li>
+                                            <span class="ml-2 text-slate-500" x-text="'(' + c.code + ') ' + c.name"></span>
+                                        </button>                                    </li>
                                 </template>
                             </ul>
                         </div>
-                        <input type="hidden" name="currency" :value="selected.code">
+                        <input type="hidden" id="selectedCurrency" name="currency" :value="selected.code" value="<?= e($editMode ? $inv['currency'] : $baseCurrency) ?>">
                     </div>
                 </div>
                 <div>
-                    <label class="<?= t('label') ?>">Rate <span class="text-red-400">*</span></label>
+                    <label class="<?= t('label') ?>" x-text="selected.code === baseCurrency ? 'Rate *' : (selected.code + ' 1 = ' + baseCurrency + ' *')"></label>
                     <input type="number" name="rate" x-model="rate" step="0.00001"
                            :disabled="selected.code === baseCurrency"
                            :class="selected.code === baseCurrency ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''"
@@ -1566,7 +1582,7 @@ var _customerPaymentTermName = '';
 <!-- === SECTION 3: Items === -->
 <div>
     <div class="flex items-center justify-between px-6 py-4">
-        <h3 class="text-sm font-semibold text-slate-800">Items</h3>
+        <h3 class="text-base font-bold text-slate-800">Items</h3>
         <div class="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-medium">
             <button type="button" onclick="setTaxMode('exclusive')" id="btn_exclusive"
                     class="px-3 py-1.5 bg-indigo-600 text-white transition-colors">Tax Exclusive</button>
@@ -1709,33 +1725,39 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
 
                     <!-- Qty -->
                     <td class="px-2 pt-2 pb-0">
-                        <input type="number" name="items[<?= $i ?>][quantity]" value="<?= e($qtyVal) ?>"
-                               min="0.01" step="0.01" placeholder="1.00"
-                               class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-qty"
-                               onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)">
+                        <input type="text" name="items[<?= $i ?>][quantity]" 
+                               value="<?= ($editMode && isset($item['id'])) ? e(fmtQty($qty)) : '' ?>"
+                               placeholder="1"
+                               class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-qty"
+                               onfocus="stripComma(this)"
+                               onblur="this.value=fmtQty(this.value)">
                     </td>
 
                     <!-- Unit Price -->
                     <td class="px-2 pt-2 pb-0">
-                        <input type="number" name="items[<?= $i ?>][unit_price]" value="<?= e($priceVal) ?>"
-                               min="0" step="0.01" placeholder="0.00"
-                               class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-price"
-                               onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)">
+                        <input type="text" name="items[<?= $i ?>][unit_price]" 
+                               value="<?= ($editMode && isset($item['id'])) ? e(fmtComma($price, 2)) : '' ?>"
+                               placeholder="0.00"
+                               class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-price"
+                               onfocus="stripComma(this)"
+                               onblur="this.value=fmtComma(this.value, 2)">
                     </td>
 
                     <!-- Amount (calculated) -->
                     <td class="px-2 pt-2 pb-0">
                         <input type="text" name="items[<?= $i ?>][line_total]"
-                               value="<?= ($editMode && isset($item['id'])) ? number_format($qty * $price, 2, '.', '') : '' ?>" readonly
+                               value="<?= ($editMode && isset($item['id'])) ? e(fmtComma($qty * $price, 2)) : '' ?>" readonly
                                placeholder="0.00"
                                class="w-full h-8 border border-slate-100 rounded-lg px-2.5 text-sm text-right font-semibold text-slate-700 bg-slate-50 cursor-default item-total">
                     </td>
 
                     <!-- Discount: plain text, "20.00" = fixed RM, "20.00%" = pct -->
                     <td class="px-2 pt-2 pb-0">
-                        <input type="text" name="items[<?= $i ?>][discount_raw]" value="<?= e($dv) ?>"
+                        <input type="text" name="items[<?= $i ?>][discount_raw]" 
+                               value="<?= e(fmtDiscOnLoad($discVal, $discMode)) ?>"
                                placeholder="0.00 or %"
-                               class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-disc-raw"
+                               class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-disc-raw"
+                               onfocus="stripComma(this)"
                                onblur="formatDisc(this)">
                         <input type="hidden" name="items[<?= $i ?>][discount_pct]"  class="item-disc"      value="<?= e($discVal) ?>">
                         <input type="hidden" name="items[<?= $i ?>][discount_mode]" class="item-disc-mode" value="<?= e($discMode) ?>">
@@ -1855,14 +1877,20 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
     </div>
     <!-- Totals -->
     <div class="border-t border-slate-200 px-6 py-5 flex justify-end">
-        <div class="w-72 space-y-2.5 text-sm">
+        <div class="w-80 space-y-2.5 text-sm">
             <div class="flex justify-between text-slate-600">
                 <span>Sub Total</span>
-                <span class="font-medium text-slate-800">RM <span id="dispSubtotal">0.00</span></span>
+                <div class="flex justify-between w-32 font-medium text-slate-800">
+                    <span class="currency-label">RM</span>
+                    <span id="dispSubtotal">0.00</span>
+                </div>
             </div>
             <div class="flex justify-between text-slate-600">
                 <span>Discount Given</span>
-                <span class="text-slate-500">RM <span id="dispDiscount">0.00</span></span>
+                <div class="flex justify-between w-32 text-slate-500">
+                    <span class="currency-label">RM</span>
+                    <span id="dispDiscount">0.00</span>
+                </div>
             </div>
             <div id="taxBreakdown"></div>
             <div class="flex items-center justify-between text-slate-600">
@@ -1873,11 +1901,17 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                         <div id="roundThumb" class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"></div>
                     </button>
                 </div>
-                <span class="text-slate-400">RM <span id="dispRounding">0.00</span></span>
+                <div class="flex justify-between w-32 text-slate-400">
+                    <span class="currency-label">RM</span>
+                    <span id="dispRounding">0.00</span>
+                </div>
             </div>
             <div class="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 text-base">
                 <span>TOTAL</span>
-                <span>RM <span id="dispTotal">0.00</span></span>
+                <div class="flex justify-between w-32">
+                    <span class="currency-label">RM</span>
+                    <span id="dispTotal">0.00</span>
+                </div>
             </div>
         </div>
     </div>
@@ -2012,9 +2046,9 @@ $paymentMethodLabels = [
             Payment
         </button>
         <div class="text-sm text-slate-500">
-            Paid: <span class="font-semibold text-slate-800 ml-1">RM <span id="pmtPaidTotal">0.00</span></span>
+            Paid: <span class="font-semibold text-slate-800 ml-1"><span class="currency-label">RM</span> <span id="pmtPaidTotal">0.00</span></span>
             <span class="mx-2 text-slate-300">|</span>
-            Balance: <span id="pmtBalanceLabel" class="font-semibold ml-1 text-slate-800">RM <span id="pmtBalance">0.00</span></span>
+            Balance: <span id="pmtBalanceLabel" class="font-semibold ml-1 text-slate-800"><span class="currency-label">RM</span> <span id="pmtBalance">0.00</span></span>
         </div>
     </div>
 </div>
@@ -2168,7 +2202,7 @@ $paymentMethodLabels = [
 <!-- Sticky footer -->
 <div class="fixed bottom-0 right-0 bg-white border-t border-slate-200 z-20 flex items-center justify-between px-8 py-3" style="left:256px">
     <div class="text-sm text-slate-500">
-        Total: <span class="font-bold text-slate-900 text-base ml-1">RM <span id="footerTotal">0.00</span></span>
+        Total: <span class="font-bold text-slate-900 text-base ml-1"><span class="currency-label">RM</span> <span id="footerTotal">0.00</span></span>
     </div>
     <div class="flex items-center gap-3">
         <label class="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
@@ -2459,19 +2493,25 @@ function ddPos(trigger, panel) {
 })();
 
 // -- LHDN description lookup ----------------
-// -- Discount formatter (called onblur) ----------------
+function stripComma(input) {
+    input.value = input.value.replace(/,/g, '');
+}
+
 // "20.00%" -> pct mode, "20.00" -> fixed mode. Always 2dp.
 function formatDisc(input) {
-    var raw   = input.value.trim();
+    var raw   = input.value.trim().replace(/,/g, '');
     var isPct = raw.endsWith('%');
     var num   = parseFloat(raw.replace('%','')) || 0;
-    input.value = isPct ? num.toFixed(2)+'%' : num.toFixed(2);
+    
+    input.value = isPct ? num.toFixed(2)+'%' : fmtComma(num, 2);
+    
     var row = input.closest('tr');
     if (!row) return;
     var dEl = row.querySelector('.item-disc');
     var mEl = row.querySelector('.item-disc-mode');
     if (dEl) dEl.value = num;
     if (mEl) mEl.value = isPct ? 'pct' : 'fixed';
+    calcRow(row);
 }
 
 // -- Tax mode ----------------
@@ -2492,14 +2532,36 @@ function toggleRounding() {
     updateTotals();
 }
 
+function fmtComma(v, dp) {
+    var n = parseFloat(String(v).replace(/,/g, ''));
+    if (isNaN(n)) return dp === undefined ? '0' : (0).toFixed(dp);
+    var parts = n.toFixed(dp === undefined ? 2 : dp).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+}
+function fmtQty(v) {
+    var n = parseFloat(String(v).replace(/,/g, ''));
+    if (isNaN(n)) return '0';
+    if (n % 1 === 0) return n.toString();
+    var s = n.toFixed(2);
+    return s.replace(/\.?0+$/, '');
+}
+
+function fmtDiscOnLoad(val, mode) {
+    var n = parseFloat(val) || 0;
+    if (n === 0) return '';
+    if (mode === 'pct') return n.toFixed(2) + '%';
+    return fmtComma(n, 2);
+}
+
 // -- Row calculation ----------------
 // Tax Exclusive: Amount = qty*price - discount (pre-tax). Tax is added on top in totals.
 // Tax Inclusive: Amount = back-calculated pre-tax amount (gross / (1+rate)).
 function calcRow(row) {
     if ((row.dataset.rowType || 'item') !== 'item') return;
-    var qty   = parseFloat(row.querySelector('.item-qty').value)   || 0;
-    var price = parseFloat(row.querySelector('.item-price').value) || 0;
-    var disc  = parseFloat(row.querySelector('.item-disc').value)  || 0;
+    var qty   = parseFloat(row.querySelector('.item-qty').value.replace(/,/g, ''))   || 0;
+    var price = parseFloat(row.querySelector('.item-price').value.replace(/,/g, '')) || 0;
+    var disc  = parseFloat(row.querySelector('.item-disc').value.replace(/,/g, ''))  || 0;
     var dMode = row.querySelector('.item-disc-mode') ? row.querySelector('.item-disc-mode').value : 'pct';
     var ttype = row.querySelector('.item-tax').value;
     var trate = TAX_RATES[ttype] || 0;
@@ -2514,7 +2576,7 @@ function calcRow(row) {
         // Exclusive - Amount column shows pre-tax (after discount), tax added separately in totals
         shown = base;
     }
-    row.querySelector('.item-total').value = shown.toFixed(2);
+    row.querySelector('.item-total').value = fmtComma(shown, 2);
     updateTotals();
 }
 
@@ -2524,6 +2586,16 @@ function updateTotals() {
     var subtotal = 0, totalTax = 0, totalDisc = 0;
     var taxByType = {}; // { typeId: { label: 'SST (6%)', amount: 0 } }
     var sectionTotal = 0, sectionQty = 0, sectionDisc = 0, sectionTax = 0;
+
+    // Get current currency
+    var currInput = document.getElementById('selectedCurrency');
+    var currency  = currInput ? currInput.value : 'RM';
+    var label     = currency === 'MYR' ? 'RM' : currency;
+
+    document.querySelectorAll('.currency-label').forEach(function(el) {
+        el.textContent = label;
+    });
+
     document.querySelectorAll('#itemsBody tr.item-row').forEach(function(row) {
         var rowType = row.dataset.rowType || 'item';
         if (rowType === 'subtitle') return; // skip
@@ -2534,18 +2606,18 @@ function updateTotals() {
             var dDisc  = row.querySelector('.subtotal-disc');
             var dTax   = row.querySelector('.subtotal-tax');
             var iVal   = row.querySelector('.subtotal-value');
-            if (dTotal) dTotal.textContent = sectionTotal.toFixed(2);
-            if (dQty)   dQty.textContent   = sectionQty % 1 === 0 ? sectionQty.toString() : sectionQty.toFixed(2);
-            if (dDisc)  dDisc.textContent  = sectionDisc.toFixed(2);
-            if (dTax)   dTax.textContent   = sectionTax.toFixed(2);
+            if (dTotal) dTotal.textContent = fmtComma(sectionTotal, 2);
+            if (dQty)   dQty.textContent   = fmtQty(sectionQty);
+            if (dDisc)  dDisc.textContent  = fmtComma(sectionDisc, 2);
+            if (dTax)   dTax.textContent   = fmtComma(sectionTax, 2);
             if (iVal)   iVal.value         = sectionTotal.toFixed(2);
             sectionTotal = 0; sectionQty = 0; sectionDisc = 0; sectionTax = 0;
             return;
         }
         // Normal item row
-        var qty   = parseFloat(row.querySelector('.item-qty')  ? row.querySelector('.item-qty').value  : 0) || 0;
-        var price = parseFloat(row.querySelector('.item-price') ? row.querySelector('.item-price').value : 0) || 0;
-        var disc  = parseFloat(row.querySelector('.item-disc')  ? row.querySelector('.item-disc').value  : 0) || 0;
+        var qty   = parseFloat(row.querySelector('.item-qty')  ? row.querySelector('.item-qty').value.replace(/,/g, '')  : 0) || 0;
+        var price = parseFloat(row.querySelector('.item-price') ? row.querySelector('.item-price').value.replace(/,/g, '') : 0) || 0;
+        var disc  = parseFloat(row.querySelector('.item-disc')  ? row.querySelector('.item-disc').value.replace(/,/g, '')  : 0) || 0;
         var dMode = row.querySelector('.item-disc-mode') ? row.querySelector('.item-disc-mode').value : 'pct';
         var ttype = row.querySelector('.item-tax') ? row.querySelector('.item-tax').value : '';
         var trate = TAX_RATES[ttype] || 0;
@@ -2597,19 +2669,19 @@ function updateTotals() {
         rounding = parseFloat((rounded - total).toFixed(2));
         total    = rounded;
     }
-    document.getElementById('dispSubtotal').textContent = subtotal.toFixed(2);
-    document.getElementById('dispDiscount').textContent = totalDisc.toFixed(2);
+    document.getElementById('dispSubtotal').textContent = fmtComma(subtotal, 2);
+    document.getElementById('dispDiscount').textContent = fmtComma(totalDisc, 2);
     // Render tax breakdown by type
     var txBreak = document.getElementById('taxBreakdown');
     if (txBreak) {
         var txHtml = '';
         var txKeys = Object.keys(taxByType);
         if (txKeys.length === 0) {
-            txHtml = '<div class="flex justify-between text-slate-600"><span>Tax</span><span class="font-medium text-slate-800">RM 0.00</span></div>';
+            txHtml = '<div class="flex justify-between text-slate-600"><span>Tax</span><div class="flex justify-between w-32 font-medium text-slate-800"><span class="currency-label">' + label + '</span><span>0.00</span></div></div>';
         } else {
             txKeys.forEach(function(k) {
                 var tb = taxByType[k];
-                txHtml += '<div class="flex justify-between text-slate-600"><span>' + tb.label + '</span><span class="font-medium text-slate-800">RM ' + tb.amount.toFixed(2) + '</span></div>';
+                txHtml += '<div class="flex justify-between text-slate-600"><span>' + tb.label + '</span><div class="flex justify-between w-32 font-medium text-slate-800"><span class="currency-label">' + label + '</span><span>' + fmtComma(tb.amount, 2) + '</span></div></div>';
             });
         }
         txBreak.innerHTML = txHtml;
@@ -2619,9 +2691,9 @@ function updateTotals() {
         txBreak.style.gap = '0.625rem';
     }
     document.getElementById('hiddenTaxAmount') && (document.getElementById('hiddenTaxAmount').value = totalTax.toFixed(2));
-    document.getElementById('dispRounding').textContent = rounding.toFixed(2);
-    document.getElementById('dispTotal').textContent    = total.toFixed(2);
-    document.getElementById('footerTotal').textContent  = total.toFixed(2);
+    document.getElementById('dispRounding').textContent = fmtComma(rounding, 2);
+    document.getElementById('dispTotal').textContent    = fmtComma(total, 2);
+    document.getElementById('footerTotal').textContent  = fmtComma(total, 2);
     document.getElementById('hiddenSubtotal').value  = subtotal.toFixed(2);
 
     document.getElementById('hiddenDiscount').value  = totalDisc.toFixed(2);
@@ -2785,15 +2857,15 @@ function addRow(type) {
         '</td>'+
 
         '<td class="px-2 pt-2 pb-0">'+
-            '<input type="number" name="items['+rowIndex+'][quantity]" placeholder="1.00" min="0.01" step="0.01" '+
-            'class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-qty" '+
-            'onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)">'+
+            '<input type="text" name="items['+rowIndex+'][quantity]" placeholder="1" '+
+            'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-qty" '+
+            'onblur="this.value=fmtQty(this.value)">'+
         '</td>'+
 
         '<td class="px-2 pt-2 pb-0">'+
-            '<input type="number" name="items['+rowIndex+'][unit_price]" placeholder="0.00" min="0" step="0.01" '+
-            'class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-price" '+
-            'onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)">'+
+            '<input type="text" name="items['+rowIndex+'][unit_price]" placeholder="0.00" '+
+            'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-price" '+
+            'onblur="this.value=fmtComma(this.value, 2)">'+
         '</td>'+
 
         '<td class="px-2 pt-2 pb-0">'+
@@ -2803,7 +2875,7 @@ function addRow(type) {
 
         '<td class="px-2 pt-2 pb-0">'+
             '<input type="text" name="items['+rowIndex+'][discount_raw]" value="" placeholder="0.00 or %" '+
-            'class="no-spin w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-disc-raw" '+
+            'class="w-full h-8 border border-slate-200 rounded-lg px-2.5 text-sm text-right focus:outline-none focus:border-indigo-500 transition item-disc-raw" '+
             'onblur="formatDisc(this)">'+
             '<input type="hidden" name="items['+rowIndex+'][discount_pct]" class="item-disc" value="0">'+
             '<input type="hidden" name="items['+rowIndex+'][discount_mode]" class="item-disc-mode" value="pct">'+
@@ -3750,14 +3822,22 @@ function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
     }
 
     var def = sorted.find(function(c){ return c.code === initialCode; }) || sorted[0];
+    var enforcedRate = (def.code === baseCurrency) ? 1.0 : (initialRate || 1.0);
+
     return {
         q:         '',
         open:      false,
         activeIdx: -1,
-        selected:  { code: def.code, label: def.code + ' - ' + def.name },
+        selected:  { code: def.code, label: def.code + ' \u2014 ' + def.name },
         baseCurrency: baseCurrency,
-        rate:      initialRate || 1.0,
+        rate:      enforcedRate,
         currencies: sorted,
+        init: function() {
+            var self = this;
+            this.$nextTick(function() {
+                if (typeof updateTotals === 'function') updateTotals();
+            });
+        },
         get filtered() {
             var q = this.q.trim().toLowerCase();
             if (!q) return this.currencies;
@@ -3780,9 +3860,43 @@ function invoiceCurrencyComp(initialCode, baseCurrency, initialRate) {
             this.q         = '';
             this.open      = false;
             this.activeIdx = -1;
+
+            // If same with base currency, lock rate to 1
+            if (c.code === this.baseCurrency) {
+                this.rate = 1.0;
+                this.$nextTick(function() {
+                    if (typeof updateTotals === 'function') updateTotals();
+                });
+            } else {
+                this.fetchRate(c.code);
+            }
+
             // Blur so next click fires @focus fresh
             var inp = document.getElementById('invoiceCurrencyInput');
             if (inp) inp.blur();
+        },
+        fetchRate: function(from) {
+            var self = this;
+            var fromLower = from.toLowerCase();
+            var toLower = this.baseCurrency.toLowerCase();
+            
+            // Using fawazahmed0/currency-api (Free, no key, supports 150+ currencies including AFN)
+            var url = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/' + fromLower + '.json';
+            
+            fetch(url)
+                .then(function(res) { 
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json(); 
+                })
+                .then(function(data) {
+                    if (data && data[fromLower] && data[fromLower][toLower]) {
+                        self.rate = data[fromLower][toLower];
+                        if (typeof updateTotals === 'function') updateTotals();
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Exchange rate fetch failed:', err);
+                });
         },
         pickActive: function() {
             var list = this.filtered;

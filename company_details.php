@@ -627,7 +627,7 @@ function companyCurrencyComp(initialCode) {
             var self = this;
             setTimeout(function() {
                 if (self.open) { self.cancel(); }
-            }, 200);
+            }, 20);
         }
     };
 }

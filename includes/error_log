@@ -82,3 +82,7 @@ Stack trace:
 Stack trace:
 #0 {main}
   thrown in /home/ssisbcom/public_html/evieweb.com/project/includes/header.php on line 5
+[23-Apr-2026 02:46:20 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function authUser() in /home/ssisbcom/public_html/evieweb.com/project/includes/header.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ssisbcom/public_html/evieweb.com/project/includes/header.php on line 5

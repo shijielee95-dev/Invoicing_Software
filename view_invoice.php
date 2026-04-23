@@ -215,11 +215,12 @@ document.getElementById('pageActions').innerHTML = `
             // Currency-split helper: symbol left, amount right
             $cur = $inv['currency'] ?? 'MYR';
             $sym = $cur === 'MYR' ? 'RM' : e($cur);
-            function rmSplit(float $amount, string $sym, string $cls = 'text-slate-700'): string {
-                return '<span class="flex items-center justify-between gap-1 whitespace-nowrap"><span class="text-slate-400 shrink-0 text-xs">'.$sym.'</span><span class="'.$cls.'">'.number_format($amount, 2).'</span></span>';
+            if (!function_exists('rmSplit')) {
+                function rmSplit(float $amount, string $sym, string $cls = 'text-slate-700'): string {
+                    return '<span class="flex items-center justify-between gap-1 whitespace-nowrap"><span class="text-slate-400 shrink-0 text-xs">'.$sym.'</span><span class="'.$cls.'">'.number_format($amount, 2).'</span></span>';
+                }
             }
-            ?>
-            <style>
+            ?>            <style>
             .inv-items-table td { vertical-align: middle; }
             </style>
             <table class="w-full text-sm mb-6 inv-items-table" style="table-layout:fixed">
@@ -352,8 +353,8 @@ document.getElementById('pageActions').innerHTML = `
             }
             ?>
             <div class="flex justify-end mt-2">
-                <table class="text-sm" style="min-width:260px">
-                    <colgroup><col><col style="width:40px;text-align:right"><col style="width:110px"></colgroup>
+                <table class="text-sm" style="min-width:320px">
+                    <colgroup><col><col style="width:40px;text-align:right"><col style="width:130px"></colgroup>
                     <tbody>
                     <tr class="text-slate-600">
                         <td class="py-1 pr-4">Subtotal</td>
@@ -1019,9 +1020,9 @@ function showHistory(data, action, userName, dateStr) {
         }
 
         var tf = [['Sub Total','subtotal'],['Discount (−)','discount'],['Rounding Adjustment','rounding'],['TOTAL','total_amount']];
-        html += '<div class="flex justify-end mt-4"><table class="text-sm" style="width:320px">';
+        html += '<div class="flex justify-end mt-4"><table class="text-sm" style="width:360px">';
         if (isUpdate) {
-            html += '<thead><tr class="border-b border-slate-200"><th class="text-left pb-1.5 text-xs font-semibold text-slate-500"></th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-24">Before</th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-24">After</th></tr></thead>';
+            html += '<thead><tr class="border-b border-slate-200"><th class="text-left pb-1.5 text-xs font-semibold text-slate-500"></th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-32">Before</th><th class="text-right pb-1.5 text-xs font-semibold text-slate-500 w-32">After</th></tr></thead>';
         }
         html += '<tbody>';
         // Sub Total + Discount
@@ -1030,8 +1031,8 @@ function showHistory(data, action, userName, dateStr) {
             var ov = parseFloat(o[f[1]]) || 0, nv = parseFloat((n[f[1]]!==undefined?n[f[1]]:o[f[1]])) || 0;
             var ch = isUpdate && ov.toFixed(2)!==nv.toFixed(2);
             html += '<tr class="border-b border-slate-100 '+(ch?'bg-amber-50/50':'')+'"><td class="py-1.5 px-2 text-slate-600">'+f[0]+'</td>';
-            if (isUpdate) html += '<td class="py-1.5 px-2 text-right '+(ch?'text-red-400':'text-slate-400')+'">'+fmtN(ov)+'</td>';
-            html += '<td class="py-1.5 px-2 text-right text-slate-700 font-medium">'+fmtN(nv)+'</td></tr>';
+            if (isUpdate) html += '<td class="py-1.5 px-2 '+(ch?'text-red-400':'text-slate-400')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(ov)+'</span></div></td>';
+            html += '<td class="py-1.5 px-2 text-slate-700 font-medium"><div class="flex justify-between"><span>RM</span><span>'+fmtN(nv)+'</span></div></td></tr>';
         });
         // Per-type tax rows
         var newItems = n.items || o.items || [];
@@ -1041,8 +1042,8 @@ function showHistory(data, action, userName, dateStr) {
         var allTaxTypes = Object.keys(Object.assign({}, newTaxByType, oldTaxByType));
         if (allTaxTypes.length === 0) {
             html += '<tr class="border-b border-slate-100"><td class="py-1.5 px-2 text-slate-600">Tax'+'</td>';
-            if (isUpdate) html += '<td class="py-1.5 px-2 text-right text-slate-400">0.00</td>';
-            html += '<td class="py-1.5 px-2 text-right text-slate-700 font-medium">0.00</td></tr>';
+            if (isUpdate) html += '<td class="py-1.5 px-2 text-slate-400"><div class="flex justify-between"><span>RM</span><span>0.00</span></div></td>';
+            html += '<td class="py-1.5 px-2 text-slate-700 font-medium"><div class="flex justify-between"><span>RM</span><span>0.00</span></div></td></tr>';
         } else {
             allTaxTypes.forEach(function(k) {
                 var nAmt = newTaxByType[k] ? newTaxByType[k].amount : 0;
@@ -1050,8 +1051,8 @@ function showHistory(data, action, userName, dateStr) {
                 var lbl  = (newTaxByType[k] || oldTaxByType[k]).label;
                 var ch   = isUpdate && oAmt.toFixed(2) !== nAmt.toFixed(2);
                 html += '<tr class="border-b border-slate-100 '+(ch?'bg-amber-50/50':'')+'"><td class="py-1.5 px-2 text-slate-600">'+esc(lbl)+'</td>';
-                if (isUpdate) html += '<td class="py-1.5 px-2 text-right '+(ch?'text-red-400':'text-slate-400')+'">'+fmtN(oAmt)+'</td>';
-                html += '<td class="py-1.5 px-2 text-right text-slate-700 font-medium">'+fmtN(nAmt)+'</td></tr>';
+                if (isUpdate) html += '<td class="py-1.5 px-2 '+(ch?'text-red-400':'text-slate-400')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(oAmt)+'</span></div></td>';
+                html += '<td class="py-1.5 px-2 text-slate-700 font-medium"><div class="flex justify-between"><span>RM</span><span>'+fmtN(nAmt)+'</span></div></td></tr>';
             });
         }
         // Rounding + Total
@@ -1061,8 +1062,8 @@ function showHistory(data, action, userName, dateStr) {
             var isT = f[1]==='total_amount', ch = isUpdate && ov.toFixed(2)!==nv.toFixed(2);
             var bg = isT ? 'bg-amber-50' : (ch ? 'bg-amber-50/50' : '');
             html += '<tr class="border-b border-slate-100 '+bg+'"><td class="py-1.5 px-2 text-slate-600 '+(isT?'font-bold':'')+'">'+f[0]+'</td>';
-            if (isUpdate) html += '<td class="py-1.5 px-2 text-right '+(ch?'text-red-400':'text-slate-400')+'">'+fmtN(ov)+'</td>';
-            html += '<td class="py-1.5 px-2 text-right '+(isT?'font-bold text-slate-900':'text-slate-800 font-medium')+'">'+fmtN(nv)+'</td></tr>';
+            if (isUpdate) html += '<td class="py-1.5 px-2 '+(ch?'text-red-400':'text-slate-400')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(ov)+'</span></div></td>';
+            html += '<td class="py-1.5 px-2 '+(isT?'font-bold text-slate-900':'text-slate-800 font-medium')+'"><div class="flex justify-between"><span>RM</span><span>'+fmtN(nv)+'</span></div></td></tr>';
         });
         html += '</tbody></table></div>';
         html += '</div></div></div>';

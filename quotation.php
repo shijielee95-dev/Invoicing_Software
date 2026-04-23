@@ -1490,18 +1490,27 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
     </div>
     <!-- Totals -->
     <div class="border-t border-slate-200 px-6 py-5 flex justify-end">
-        <div class="w-72 space-y-2.5 text-sm">
+        <div class="w-80 space-y-2.5 text-sm">
             <div class="flex justify-between text-slate-600">
                 <span>Sub Total</span>
-                <span class="font-medium text-slate-800">RM <span id="dispSubtotal">0.00</span></span>
+                <div class="flex justify-between w-32 font-medium text-slate-800">
+                    <span>RM</span>
+                    <span id="dispSubtotal">0.00</span>
+                </div>
             </div>
             <div class="flex justify-between text-slate-600">
                 <span>Discount Given</span>
-                <span class="text-slate-500">RM <span id="dispDiscount">0.00</span></span>
+                <div class="flex justify-between w-32 text-slate-500">
+                    <span>RM</span>
+                    <span id="dispDiscount">0.00</span>
+                </div>
             </div>
             <div class="flex justify-between text-slate-600">
                 <span>Tax</span>
-                <span class="font-medium text-slate-800">RM <span id="dispTax">0.00</span></span>
+                <div class="flex justify-between w-32 font-medium text-slate-800">
+                    <span>RM</span>
+                    <span id="dispTax">0.00</span>
+                </div>
             </div>
             <div class="flex items-center justify-between text-slate-600">
                 <div class="flex items-center gap-2">
@@ -1511,11 +1520,17 @@ $lhdnDesc = ['001'=>'Breastfeeding equipment','002'=>'Child care centres and kin
                         <div id="roundThumb" class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"></div>
                     </button>
                 </div>
-                <span class="text-slate-400">RM <span id="dispRounding">0.00</span></span>
+                <div class="flex justify-between w-32 text-slate-400">
+                    <span>RM</span>
+                    <span id="dispRounding">0.00</span>
+                </div>
             </div>
             <div class="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 text-base">
                 <span>TOTAL</span>
-                <span>RM <span id="dispTotal">0.00</span></span>
+                <div class="flex justify-between w-32">
+                    <span>RM</span>
+                    <span id="dispTotal">0.00</span>
+                </div>
             </div>
         </div>
     </div>
